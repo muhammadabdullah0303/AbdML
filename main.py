@@ -2,11 +2,11 @@
 
 import pandas as pd
 import numpy as np
-from catboost import CatBoostClassifier, Pool
-from lightgbm import LGBMClassifier
-from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import StratifiedKFold
 from tqdm import tqdm
+from catboost import CatBoostClassifier, Pool
+import lightgbm as lgb
+from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import roc_auc_score
 from IPython.display import clear_output
 
 SEED = 42
