@@ -132,12 +132,75 @@ class AbdBase:
         mean_test_preds = test_preds.mean(axis=1) if self.X_test is not None else None
         return oof_predictions, mean_test_preds
 
+    # def CAT(self, params):
+    #     if self.metric not in ["roc_auc", "accuracy"]:
+    #         raise ValueError(f"Metric '{self.metric}' is not supported. Choose from: 'roc_auc', 'accuracy'.")
+    #     if self.problem_type not in ["classification", "regression"]:
+    #         raise ValueError(f"Problem type '{self.problem_type}' is not supported. Choose from: 'classification', 'regression'.")
+
+    #     kfold = StratifiedKFold(n_splits=self.n_splits, shuffle=True, random_state=self.seed)
+    #     train_scores = []
+    #     oof_scores = []
+    #     oof_predictions = np.zeros((len(self.y_train), self.num_classes)) if self.num_classes > 2 else np.zeros(len(self.y_train))
+    #     test_preds = (
+    #         None if self.X_test is None else
+    #         np.zeros((len(self.X_test), self.n_splits, self.num_classes)) if self.num_classes > 2 else
+    #         np.zeros((len(self.X_test), self.n_splits))
+    #     )
+
+    #     cat_features_indices = [self.X_train.columns.get_loc(col) for col in self.cat_features if col in self.X_train.columns]
+
+    #     for fold, (train_idx, val_idx) in enumerate(tqdm(kfold.split(self.X_train, self.y_train), desc="Training Folds", total=self.n_splits)):
+    #         X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
+    #         y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
+
+    #         X_train_pool = Pool(X_train, y_train, cat_features=cat_features_indices)
+    #         X_val_pool = Pool(X_val, y_val, cat_features=cat_features_indices)
+
+    #         model = CatBoostClassifier(**params) if self.problem_type == 'classification' else CatBoostRegressor(**params)
+    #         model.fit(X_train_pool, eval_set=X_val_pool, verbose=False, early_stopping_rounds=200)
+
+    #         if self.problem_type == 'classification':
+    #             y_train_pred = model.predict_proba(X_train_pool) if self.num_classes > 2 else model.predict_proba(X_train_pool)[:, 1]
+    #             y_val_pred = model.predict_proba(X_val_pool) if self.num_classes > 2 else model.predict_proba(X_val_pool)[:, 1]
+    #         else:
+    #             y_train_pred = model.predict(X_train_pool)
+    #             y_val_pred = model.predict(X_val_pool)
+
+    #         oof_predictions[val_idx] = y_val_pred
+
+    #         if self.X_test is not None:
+    #             test_pool = Pool(self.X_test, cat_features=cat_features_indices)
+    #             test_preds[:, fold] = model.predict_proba(test_pool) if self.num_classes > 2 else model.predict(test_pool)
+
+    #         if self.metric == "accuracy":
+    #             train_scores.append(accuracy_score(y_train, np.argmax(y_train_pred, axis=1) if self.num_classes > 2 else (y_train_pred > 0.5).astype(int)))
+    #             oof_scores.append(accuracy_score(y_val, np.argmax(y_val_pred, axis=1) if self.num_classes > 2 else (y_val_pred > 0.5).astype(int)))
+    #         elif self.metric == "roc_auc":
+    #             train_scores.append(roc_auc_score(y_train, y_train_pred, multi_class="ovr" if self.num_classes > 2 else None))
+    #             oof_scores.append(roc_auc_score(y_val, y_val_pred, multi_class="ovr" if self.num_classes > 2 else None))
+
+    #         print(f"Fold {fold + 1} - Train {self.metric.upper()}: {train_scores[-1]:.4f}, OOF {self.metric.upper()}: {oof_scores[-1]:.4f}")
+    #         clear_output(wait=True)
+
+    #     print(f"Overall Train {self.metric.upper()}: {np.mean(train_scores):.4f}")
+    #     print(f"Overall OOF {self.metric.upper()}: {np.mean(oof_scores):.4f}")
+
+    #     mean_test_preds = test_preds.mean(axis=1) if self.X_test is not None else None
+    #     return oof_predictions, mean_test_preds
+
     def CAT(self, params):
         if self.metric not in ["roc_auc", "accuracy"]:
             raise ValueError(f"Metric '{self.metric}' is not supported. Choose from: 'roc_auc', 'accuracy'.")
         if self.problem_type not in ["classification", "regression"]:
             raise ValueError(f"Problem type '{self.problem_type}' is not supported. Choose from: 'classification', 'regression'.")
-
+    
+        for col in self.X_train.columns:
+            if col not in self.cat_features and self.X_train[col].dtype == 'object':
+                raise ValueError(f"Column '{col}' contains non-numeric values in a numeric column. Check data.")
+    
+        cat_features_indices = [self.X_train.columns.get_loc(col) for col in self.cat_features if col in self.X_train.columns]
+    
         kfold = StratifiedKFold(n_splits=self.n_splits, shuffle=True, random_state=self.seed)
         train_scores = []
         oof_scores = []
@@ -147,44 +210,42 @@ class AbdBase:
             np.zeros((len(self.X_test), self.n_splits, self.num_classes)) if self.num_classes > 2 else
             np.zeros((len(self.X_test), self.n_splits))
         )
-
-        cat_features_indices = [self.X_train.columns.get_loc(col) for col in self.cat_features if col in self.X_train.columns]
-
+    
         for fold, (train_idx, val_idx) in enumerate(tqdm(kfold.split(self.X_train, self.y_train), desc="Training Folds", total=self.n_splits)):
             X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
             y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
-
+    
             X_train_pool = Pool(X_train, y_train, cat_features=cat_features_indices)
             X_val_pool = Pool(X_val, y_val, cat_features=cat_features_indices)
-
+    
             model = CatBoostClassifier(**params) if self.problem_type == 'classification' else CatBoostRegressor(**params)
             model.fit(X_train_pool, eval_set=X_val_pool, verbose=False, early_stopping_rounds=200)
-
+    
             if self.problem_type == 'classification':
                 y_train_pred = model.predict_proba(X_train_pool) if self.num_classes > 2 else model.predict_proba(X_train_pool)[:, 1]
                 y_val_pred = model.predict_proba(X_val_pool) if self.num_classes > 2 else model.predict_proba(X_val_pool)[:, 1]
             else:
                 y_train_pred = model.predict(X_train_pool)
                 y_val_pred = model.predict(X_val_pool)
-
+    
             oof_predictions[val_idx] = y_val_pred
-
+    
             if self.X_test is not None:
                 test_pool = Pool(self.X_test, cat_features=cat_features_indices)
                 test_preds[:, fold] = model.predict_proba(test_pool) if self.num_classes > 2 else model.predict(test_pool)
-
+    
             if self.metric == "accuracy":
                 train_scores.append(accuracy_score(y_train, np.argmax(y_train_pred, axis=1) if self.num_classes > 2 else (y_train_pred > 0.5).astype(int)))
                 oof_scores.append(accuracy_score(y_val, np.argmax(y_val_pred, axis=1) if self.num_classes > 2 else (y_val_pred > 0.5).astype(int)))
             elif self.metric == "roc_auc":
                 train_scores.append(roc_auc_score(y_train, y_train_pred, multi_class="ovr" if self.num_classes > 2 else None))
                 oof_scores.append(roc_auc_score(y_val, y_val_pred, multi_class="ovr" if self.num_classes > 2 else None))
-
+    
             print(f"Fold {fold + 1} - Train {self.metric.upper()}: {train_scores[-1]:.4f}, OOF {self.metric.upper()}: {oof_scores[-1]:.4f}")
             clear_output(wait=True)
-
+    
         print(f"Overall Train {self.metric.upper()}: {np.mean(train_scores):.4f}")
         print(f"Overall OOF {self.metric.upper()}: {np.mean(oof_scores):.4f}")
-
+    
         mean_test_preds = test_preds.mean(axis=1) if self.X_test is not None else None
         return oof_predictions, mean_test_preds
