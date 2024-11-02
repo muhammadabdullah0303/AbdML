@@ -60,7 +60,7 @@ class AbdBase:
             y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
 
             model = lgb.LGBMClassifier(**params) if self.problem_type == 'classification' else lgb.LGBMRegressor(**params)
-            model.fit(X_train, y_train, eval_set=[(X_val, y_val)], early_stopping_rounds=200, verbose=False)
+            model.fit(X_train, y_train, eval_set=[(X_val, y_val)])
 
             y_train_pred = model.predict_proba(X_train)[:, 1] if self.problem_type == 'classification' else model.predict(X_train)
             y_val_pred = model.predict_proba(X_val)[:, 1] if self.problem_type == 'classification' else model.predict(X_val)
