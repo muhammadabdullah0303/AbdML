@@ -55,8 +55,8 @@ class AbdBase:
             model = lgb.LGBMClassifier(**params)
             model.fit(X_train, y_train)
 
-            y_train_pred = model.predict(X_train)
-            y_val_pred = model.predict(X_val)
+            y_train_pred = model.predict_proba(X_train)[:, 1]
+            y_val_pred = model.predict_proba(X_val)[:, 1]
 
             oof_predictions[val_idx] = y_val_pred
 
@@ -74,7 +74,7 @@ class AbdBase:
         print(f"Overall Train AUC: {np.mean(train_scores):.4f}")
         print(f"Overall OOF AUC: {np.mean(oof_scores):.4f}")
 
-        mean_test_preds = np.round(test_preds.mean(axis=1)).astype(int)
+        mean_test_preds = test_preds.mean(axis=1)
         return oof_predictions, mean_test_preds
 
     def CAT(self, params):
