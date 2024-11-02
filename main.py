@@ -6,7 +6,7 @@ from tqdm import tqdm
 from catboost import CatBoostClassifier, Pool
 import lightgbm as lgb
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score , accuracy_score
 from IPython.display import clear_output
 
 SEED = 42
@@ -18,7 +18,7 @@ class AbdBase:
         self.test_data = test_data
         self.target_column = target_column
         self.problem_type = problem_type
-        self.metric = metric
+        self.metric = metric_
         self.seed = seed
         self.n_splits = n_splits
         self.cat_features = cat_features if cat_features else []
