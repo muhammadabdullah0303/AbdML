@@ -81,56 +81,56 @@ class AbdBase:
         mean_test_preds = test_preds.mean(axis=1)
         return oof_predictions, mean_test_preds
 
-def CAT(self, params):
-    kfold = StratifiedKFold(n_splits=self.n_splits, shuffle=True, random_state=self.seed)
-    train_scores = []
-    oof_scores = []
-    oof_predictions = np.zeros(len(self.y_train))
-    test_preds = np.zeros((len(self.X_test), self.n_splits))
-
-    cat_features_indices = [self.X_train.columns.get_loc(col) for col in self.cat_features if col in self.X_train.columns]
-
-    for fold, (train_idx, val_idx) in enumerate(tqdm(kfold.split(self.X_train, self.y_train), desc="Training Folds", total=self.n_splits)):
-        X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
-        y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
-
-        X_train_pool = Pool(X_train, y_train, cat_features=cat_features_indices)
-        X_val_pool = Pool(X_val, y_val, cat_features=cat_features_indices)
-
-        model = CatBoostClassifier(**params) if self.problem_type == 'classification' else CatBoostRegressor(**params)
-        model.fit(X_train_pool, eval_set=X_val_pool, verbose=False, early_stopping_rounds=200)
-
+    def CAT(self, params):
+        kfold = StratifiedKFold(n_splits=self.n_splits, shuffle=True, random_state=self.seed)
+        train_scores = []
+        oof_scores = []
+        oof_predictions = np.zeros(len(self.y_train))
+        test_preds = np.zeros((len(self.X_test), self.n_splits))
+    
+        cat_features_indices = [self.X_train.columns.get_loc(col) for col in self.cat_features if col in self.X_train.columns]
+    
+        for fold, (train_idx, val_idx) in enumerate(tqdm(kfold.split(self.X_train, self.y_train), desc="Training Folds", total=self.n_splits)):
+            X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
+            y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
+    
+            X_train_pool = Pool(X_train, y_train, cat_features=cat_features_indices)
+            X_val_pool = Pool(X_val, y_val, cat_features=cat_features_indices)
+    
+            model = CatBoostClassifier(**params) if self.problem_type == 'classification' else CatBoostRegressor(**params)
+            model.fit(X_train_pool, eval_set=X_val_pool, verbose=False, early_stopping_rounds=200)
+    
+            if self.problem_type == 'classification':
+                y_train_pred_proba = model.predict_proba(X_train_pool)[:, 1]
+                y_val_pred_proba = model.predict_proba(X_val_pool)[:, 1]
+    
+                y_train_pred = (y_train_pred_proba > 0.5).astype(int)
+                y_val_pred = (y_val_pred_proba > 0.5).astype(int)
+    
+                oof_predictions[val_idx] = y_val_pred_proba
+    
+                test_pool = Pool(self.X_test, cat_features=cat_features_indices)
+                test_preds[:, fold] = model.predict_proba(test_pool)[:, 1]
+            else:
+                y_train_pred = model.predict(X_train_pool)
+                y_val_pred = model.predict(X_val_pool)
+                oof_predictions[val_idx] = y_val_pred
+    
+                test_pool = Pool(self.X_test, cat_features=cat_features_indices)
+                test_preds[:, fold] = model.predict(test_pool)
+    
+            train_scores.append(self.get_metric(y_train, y_train_pred))
+            oof_scores.append(self.get_metric(y_val, y_val_pred))
+    
+            print(f"Fold {fold + 1} - Train {self.metric.upper()}: {train_scores[-1]:.4f}, OOF {self.metric.upper()}: {oof_scores[-1]:.4f}")
+            clear_output(wait=True)
+    
+        print(f"Overall Train {self.metric.upper()}: {np.mean(train_scores):.4f}")
+        print(f"Overall OOF {self.metric.upper()}: {np.mean(oof_scores):.4f}")
+    
         if self.problem_type == 'classification':
-            y_train_pred_proba = model.predict_proba(X_train_pool)[:, 1]
-            y_val_pred_proba = model.predict_proba(X_val_pool)[:, 1]
-
-            y_train_pred = (y_train_pred_proba > 0.5).astype(int)
-            y_val_pred = (y_val_pred_proba > 0.5).astype(int)
-
-            oof_predictions[val_idx] = y_val_pred_proba
-
-            test_pool = Pool(self.X_test, cat_features=cat_features_indices)
-            test_preds[:, fold] = model.predict_proba(test_pool)[:, 1]
+            mean_test_preds = (test_preds.mean(axis=1) > 0.5).astype(int)
         else:
-            y_train_pred = model.predict(X_train_pool)
-            y_val_pred = model.predict(X_val_pool)
-            oof_predictions[val_idx] = y_val_pred
-
-            test_pool = Pool(self.X_test, cat_features=cat_features_indices)
-            test_preds[:, fold] = model.predict(test_pool)
-
-        train_scores.append(self.get_metric(y_train, y_train_pred))
-        oof_scores.append(self.get_metric(y_val, y_val_pred))
-
-        print(f"Fold {fold + 1} - Train {self.metric.upper()}: {train_scores[-1]:.4f}, OOF {self.metric.upper()}: {oof_scores[-1]:.4f}")
-        clear_output(wait=True)
-
-    print(f"Overall Train {self.metric.upper()}: {np.mean(train_scores):.4f}")
-    print(f"Overall OOF {self.metric.upper()}: {np.mean(oof_scores):.4f}")
-
-    if self.problem_type == 'classification':
-        mean_test_preds = (test_preds.mean(axis=1) > 0.5).astype(int)
-    else:
-        mean_test_preds = test_preds.mean(axis=1)
-        
-    return oof_predictions, mean_test_preds
+            mean_test_preds = test_preds.mean(axis=1)
+            
+        return oof_predictions, mean_test_preds
