@@ -30,6 +30,7 @@ class AbdBase:
         self.num_classes = num_classes
 
         self._validate_input()
+        self.checkTarget()
         
         self.X_train = self.train_data.drop(self.target_column, axis=1)
         self.y_train = self.train_data[self.target_column]
@@ -37,6 +38,10 @@ class AbdBase:
         
         self._display_initial_info()
 
+    def checkTarget(self):
+        if self.train_data[self.target_column].dtype == 'object':
+            raise ValueError ('Encode Target First')
+        
     def _display_initial_info(self):
         print("Available Models:", ", ".join(self.model_name))
         print("Available Metrics:", ", ".join(self.metrics))
