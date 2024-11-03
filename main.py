@@ -19,7 +19,7 @@ class AbdBase:
     
     def __init__(self, train_data, test_data=None, target_column=None,
                  problem_type="classification", metric="roc_auc", seed=SEED,
-                 n_splits=5, cat_features=None, num_classes=None, prob=True, early_stop=False): 
+                 n_splits=5, cat_features=None, num_classes=None, prob=True, early_stop=False,test_prob=False): 
         self.train_data = train_data
         self.test_data = test_data
         self.target_column = target_column
@@ -30,6 +30,7 @@ class AbdBase:
         self.cat_features = cat_features if cat_features else []
         self.num_classes = num_classes
         self.prob = prob 
+        self.test_prob = test_prob
         self.early_stop = early_stop
 
         self._validate_input()
@@ -51,7 +52,8 @@ class AbdBase:
         print("Available Problem Types:", ", ".join(self.problem_types))
         print(f"Problem Type Selected: {self.problem_type}")
         print(f"Metric Selected: {self.metric}")
-        print(f"Calculate Predicted Probabilities: {self.prob}")
+        print(f"Calculate Train Probabilities: {self.prob}")
+        print(f"Calculate Test Probabilities: {self.test_prob}")
         print(f"Early Stopping : {self.early_stop}")
 
 
@@ -141,7 +143,7 @@ class AbdBase:
 
             if self.X_test is not None:
                 if self.problem_type == 'classification':
-                    test_preds[:, fold] = model.predict_proba(self.X_test)[:, 1] if self.prob else model.predict(self.X_test)
+                    test_preds[:, fold] = model.predict_proba(self.X_test)[:, 1] if self.test_prob else model.predict(self.X_test)
                 else:
                     test_preds[:, fold] = model.predict(self.X_test)
 
