@@ -232,7 +232,7 @@ class AbdBase:
 
     def checkTarget(self):
         if self.train_data[self.target_column].dtype == 'object':
-            raise ValueError ('Encode Target First')
+            raise ValueError('Encode Target First')
         
     def _display_initial_info(self):
         print("Available Models:", ", ".join(self.model_name))
@@ -240,7 +240,7 @@ class AbdBase:
         print("Available Problem Types:", ", ".join(self.problem_types))
         print(f"Problem Type Selected: {self.problem_type}")
         print(f"Metric Selected: {self.metric}")
-        print(f"Calculate Predicted Probabilities: {self.prob}")  # <-- Display 'prob'
+        print(f"Calculate Predicted Probabilities: {self.prob}")
 
     def _validate_input(self):
         if not isinstance(self.train_data, pd.DataFrame):
@@ -258,15 +258,15 @@ class AbdBase:
 
     def get_metric(self, y_true, y_pred):
         if self.metric == 'roc_auc':
-            return roc_auc_score(y_true, y_pred, multi_class="ovr" if self.num_classes > 2 else None)
+            return roc_auc_score(y_true, y_pred)
         elif self.metric == 'accuracy':
             return accuracy_score(y_true, y_pred.round())
         elif self.metric == 'f1':
-            return f1_score(y_true, y_pred.round(), average='weighted') if self.num_classes > 2 else f1_score(y_true, y_pred.round())
+            return f1_score(y_true, y_pred.round(), average='weighted')
         elif self.metric == 'precision':
-            return precision_score(y_true, y_pred.round(), average='weighted') if self.num_classes > 2 else precision_score(y_true, y_pred.round())
+            return precision_score(y_true, y_pred.round(), average='weighted')
         elif self.metric == 'recall':
-            return recall_score(y_true, y_pred.round(), average='weighted') if self.num_classes > 2 else recall_score(y_true, y_pred.round())
+            return recall_score(y_true, y_pred.round(), average='weighted')
         elif self.metric == 'mae':
             return mean_absolute_error(y_true, y_pred)
         elif self.metric == 'r2':
@@ -306,12 +306,14 @@ class AbdBase:
 
             oof_predictions[val_idx] = y_val_pred
 
+            # Handle the metric calculation
             if self.metric == "accuracy":
                 train_scores.append(accuracy_score(y_train, np.argmax(y_train_pred, axis=1) if self.num_classes > 2 else (y_train_pred > 0.5).astype(int)))
                 oof_scores.append(accuracy_score(y_val, np.argmax(y_val_pred, axis=1) if self.num_classes > 2 else (y_val_pred > 0.5).astype(int)))
             elif self.metric == "roc_auc":
-                train_scores.append(roc_auc_score(y_train, y_train_pred, multi_class="ovr" if self.num_classes > 2 else None))
-                oof_scores.append(roc_auc_score(y_val, y_val_pred, multi_class="ovr" if self.num_classes > 2 else None))
+                # Use y_val_pred directly for binary classes
+                train_scores.append(roc_auc_score(y_train, y_train_pred[:, 1] if self.num_classes == 2 else y_train_pred))
+                oof_scores.append(roc_auc_score(y_val, y_val_pred[:, 1] if self.num_classes == 2 else y_val_pred))
 
             if self.X_test is not None:
                 test_preds[:, fold] = model.predict_proba(self.X_test) if self.prob else model.predict(self.X_test) 
@@ -341,31 +343,30 @@ class AbdBase:
             np.zeros((len(self.X_test), self.n_splits))
         )
 
-        cat_features_indices = [self.X_train.columns.get_loc(col) for col in self.cat_features]
-
         for fold, (train_idx, val_idx) in enumerate(tqdm(kfold.split(self.X_train, self.y_train), desc="Training Folds", total=self.n_splits)):
             X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
             y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
 
-            model = CatBoostClassifier(**params) if self.problem_type == 'classification' else CatBoostRegressor(**params)
-            model.fit(X_train, y_train, eval_set=(X_val, y_val), cat_features=cat_features_indices)
+            model = CatBoostClassifier(**params, cat_features=self.cat_features, verbose=0)
+            model.fit(X_train, y_train)
 
-            # <-- Change for probability prediction
             if self.problem_type == 'classification':
-                y_train_pred = model.predict_proba(X_train) if self.prob else model.predict(X_train) 
-                y_val_pred = model.predict_proba(X_val) if self.prob else model.predict(X_val) 
+                y_train_pred = model.predict_proba(X_train) if self.prob else model.predict(X_train)  
+                y_val_pred = model.predict_proba(X_val) if self.prob else model.predict(X_val)
             else:
                 y_train_pred = model.predict(X_train)
                 y_val_pred = model.predict(X_val)
 
             oof_predictions[val_idx] = y_val_pred
 
+            # Handle the metric calculation
             if self.metric == "accuracy":
                 train_scores.append(accuracy_score(y_train, np.argmax(y_train_pred, axis=1) if self.num_classes > 2 else (y_train_pred > 0.5).astype(int)))
                 oof_scores.append(accuracy_score(y_val, np.argmax(y_val_pred, axis=1) if self.num_classes > 2 else (y_val_pred > 0.5).astype(int)))
             elif self.metric == "roc_auc":
-                train_scores.append(roc_auc_score(y_train, y_train_pred, multi_class="ovr" if self.num_classes > 2 else None))
-                oof_scores.append(roc_auc_score(y_val, y_val_pred, multi_class="ovr" if self.num_classes > 2 else None))
+                # Use y_val_pred directly for binary classes
+                train_scores.append(roc_auc_score(y_train, y_train_pred[:, 1] if self.num_classes == 2 else y_train_pred))
+                oof_scores.append(roc_auc_score(y_val, y_val_pred[:, 1] if self.num_classes == 2 else y_val_pred))
 
             if self.X_test is not None:
                 test_preds[:, fold] = model.predict_proba(self.X_test) if self.prob else model.predict(self.X_test) 
@@ -373,9 +374,8 @@ class AbdBase:
             print(f"Fold {fold + 1} - Train {self.metric.upper()}: {train_scores[-1]:.4f}, OOF {self.metric.upper()}: {oof_scores[-1]:.4f}")
             clear_output(wait=True)
 
-        print(f"Overall Train {self.metric.upper()}: {np.mean(train_scores):.6f}")
-        print(f"Overall OOF {self.metric.upper()}: {np.mean(oof_scores):.6f}")
+        print(f"Overall Train {self.metric.upper()}: {np.mean(train_scores):.4f}")
+        print(f"Overall OOF {self.metric.upper()}: {np.mean(oof_scores):.4f}")
 
         mean_test_preds = test_preds.mean(axis=1) if self.X_test is not None else None
         return oof_predictions, mean_test_preds
-
