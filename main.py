@@ -148,14 +148,14 @@ class AbdBase:
             np.zeros((len(self.X_test), self.n_splits))
         )
 
-        # cat_features_indices = [self.X_train.columns.get_loc(col) for col in self.cat_features if col in self.X_train.columns]
+        cat_features_indices = [self.X_train.columns.get_loc(col) for col in self.cat_features if col in self.X_train.columns]
 
         for fold, (train_idx, val_idx) in enumerate(tqdm(kfold.split(self.X_train, self.y_train), desc="Training Folds", total=self.n_splits)):
             X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
             y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
 
-            X_train_pool = Pool(X_train, y_train, cat_features=self.cat_features)
-            X_val_pool = Pool(X_val, y_val, cat_features=self.cat_features)
+            X_train_pool = Pool(X_train, y_train, cat_features=cat_features_indices)
+            X_val_pool = Pool(X_val, y_val, cat_features=cat_features_indices)
 
             model = CatBoostClassifier(**params) if self.problem_type == 'classification' else CatBoostRegressor(**params)
             model.fit(X_train_pool, eval_set=X_val_pool, verbose=False, early_stopping_rounds=200)
@@ -170,7 +170,7 @@ class AbdBase:
             oof_predictions[val_idx] = y_val_pred
 
             if self.X_test is not None:
-                test_pool = Pool(self.X_test, cat_features=self.cat_features)
+                test_pool = Pool(self.X_test, cat_features=cat_features_indices)
                 test_preds[:, fold] = model.predict_proba(test_pool) if self.num_classes > 2 else model.predict(test_pool)
 
             if self.metric == "accuracy":
