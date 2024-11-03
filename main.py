@@ -155,9 +155,13 @@ class AbdBase:
         for fold, (train_idx, val_idx) in enumerate(tqdm(kfold.split(self.X_train, self.y_train), desc="Training Folds", total=self.n_splits)):
             X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
             y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
-
+        
+            train_pool = Pool(data=X_train, label=y_train, cat_features=cat_features_indices)
+            val_pool = Pool(data=X_val, label=y_val, cat_features=cat_features_indices)
+        
             model = CatBoostClassifier(**params, random_state=self.seed, verbose=0)
-            model.fit(X_train, y_train, eval_set=(X_val, y_val), cat_features=cat_features_indices)
+            
+            model.fit(train_pool, eval_set=val_pool, early_stopping_rounds=50)
 
             if self.problem_type == 'classification':
                 y_train_pred = model.predict_proba(X_train)[:, 1] if self.prob else model.predict(X_train)  
