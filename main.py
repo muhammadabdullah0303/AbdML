@@ -89,7 +89,8 @@ class AbdBase:
         else:
             raise ValueError(f"Unsupported metric '{self.metric}'")
 
-    def Train_ML(self, params, model_name,e_stop=N):
+    def Train_ML(self, params, model_name,e_stop=50):
+        print(f"The Val of EarlyStopping is {e_stop}")
         if self.metric not in ["roc_auc", "accuracy"]:
             raise ValueError(f"Metric '{self.metric}' is not supported. Choose from: 'roc_auc', 'accuracy'.")
         if self.problem_type not in ["classification", "regression"]:
