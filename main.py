@@ -169,7 +169,7 @@
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
-from catboost import CatBoostClassifier, Pool
+from catboost import CatBoostClassifier, Pool , CatBoostRegressor
 import lightgbm as lgb
 from sklearn.model_selection import StratifiedKFold, KFold, GroupKFold
 from sklearn.metrics import *
