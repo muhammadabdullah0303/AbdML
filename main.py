@@ -5,7 +5,7 @@ from tqdm import tqdm
 from catboost import CatBoostClassifier, Pool
 import lightgbm as lgb
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import roc_auc_score, accuracy_score, f1_score, precision_score, recall_score, mean_absolute_error, r2_score
+from sklearn.metrics import *
 from IPython.display import clear_output
 
 SEED = 42
@@ -13,7 +13,7 @@ SEED = 42
 class AbdBase:
     
     model_name = ["LGBM", "CAT", "XGB"]
-    metrics = ["roc_auc", "accuracy", "f1", "precision", "recall"]
+    metrics = ["roc_auc", "accuracy", "f1", "precision", "recall",'rmse']
     regression_metrics = ["mae", "r2"]
     problem_types = ["classification", "regression"]
     
@@ -71,6 +71,11 @@ class AbdBase:
         if not isinstance(self.n_splits, int) or self.n_splits < 2:
             raise ValueError("n_splits must be an integer greater than 1.")
 
+    from sklearn.metrics import (
+        roc_auc_score, accuracy_score, f1_score, precision_score, recall_score, 
+        mean_absolute_error, r2_score, mean_squared_error
+    )
+
     def get_metric(self, y_true, y_pred):
         if self.metric == 'roc_auc':
             return roc_auc_score(y_true, y_pred, multi_class="ovr" if self.num_classes > 2 else None)
@@ -86,8 +91,11 @@ class AbdBase:
             return mean_absolute_error(y_true, y_pred)
         elif self.metric == 'r2':
             return r2_score(y_true, y_pred)
+        elif self.metric == 'rmse':
+            return mean_squared_error(y_true, y_pred, squared=False)
         else:
             raise ValueError(f"Unsupported metric '{self.metric}'")
+
 
     def Train_ML(self, params, model_name,e_stop=50):
         print(f"The Val of EarlyStopping is {e_stop}")
