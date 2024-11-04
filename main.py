@@ -89,7 +89,7 @@ class AbdBase:
         else:
             raise ValueError(f"Unsupported metric '{self.metric}'")
 
-    def Train_ML(self, params, model_name):
+    def Train_ML(self, params, model_name,e_stop=N):
         if self.metric not in ["roc_auc", "accuracy"]:
             raise ValueError(f"Metric '{self.metric}' is not supported. Choose from: 'roc_auc', 'accuracy'.")
         if self.problem_type not in ["classification", "regression"]:
@@ -123,7 +123,7 @@ class AbdBase:
             if model_name == 'LGBM':
                 model.fit(X_train, y_train, eval_set=[(X_val, y_val)])
             elif model_name == 'CAT':
-                model.fit(train_pool, eval_set=val_pool, early_stopping_rounds=50 if self.early_stop==True else None )
+                model.fit(train_pool, eval_set=val_pool, early_stopping_rounds=N if self.early_stop==True else None )
 
             if self.problem_type == 'classification':
                 y_train_pred = model.predict_proba(X_train)[:, 1] if self.prob else model.predict(X_train)
