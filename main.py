@@ -124,7 +124,7 @@ class AbdBase:
             if model_name == 'LGBM':
                 model.fit(X_train, y_train, eval_set=[(X_val, y_val)])
             elif model_name == 'CAT':
-                model.fit(train_pool, eval_set=val_pool, early_stopping_rounds=N if self.early_stop==True else None )
+                model.fit(train_pool, eval_set=val_pool, early_stopping_rounds=e_stop if self.early_stop==True else None )
 
             if self.problem_type == 'classification':
                 y_train_pred = model.predict_proba(X_train)[:, 1] if self.prob else model.predict(X_train)
