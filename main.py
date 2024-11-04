@@ -306,7 +306,7 @@ class AbdBase:
             elif model_name == 'CAT':
                 train_pool = Pool(data=X_train, label=y_train, cat_features=cat_features_indices)
                 val_pool = Pool(data=X_val, label=y_val, cat_features=cat_features_indices)
-                model = CatBoostClassifier(**params, random_state=self.seed, verbose=0) if self.problem_type == 'classification' else CatBoostRegressor(**params)
+                model = CatBoostClassifier(**params, random_state=self.seed, verbose=0) if self.problem_type == 'classification' else CatBoostRegressor(**params, random_state=self.seed, verbose=0)
             else:
                 raise ValueError("model_name must be 'LGBM' or 'CAT'.")
 
