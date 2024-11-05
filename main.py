@@ -162,6 +162,9 @@ class AbdBase:
             elif self.metric == "roc_auc":
                 train_scores.append(roc_auc_score(y_train, y_train_pred, multi_class="ovr" if self.num_classes > 2 else None))
                 oof_scores.append(roc_auc_score(y_val, y_val_pred, multi_class="ovr" if self.num_classes > 2 else None))
+            else :
+                 train_scores.append(self.metric(y_train, y_train_pred))
+                 oof_scores.append(self.metric(y_val, y_val_pred))               
 
             if self.X_test is not None:
                 if self.problem_type == 'classification':
