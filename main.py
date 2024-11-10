@@ -144,7 +144,7 @@ class AbdBase:
 
             callbacks = [early_stopping(stopping_rounds=e_stop, verbose=False)]
             if model_name == 'LGBM':
-                model.fit(X_train, y_train, eval_set=[(X_val, y_val)],callbacks=callbacks)
+                model.fit(X_train, y_train, eval_set=[(X_val, y_val)],callbacks=callbacks if self.early_stop else None)
             elif model_name == 'CAT':
                 model.fit(train_pool, eval_set=val_pool, early_stopping_rounds=e_stop if self.early_stop else None)
 
