@@ -8,12 +8,14 @@ from lightgbm import LGBMRegressor, early_stopping
 from sklearn.model_selection import StratifiedKFold, KFold, GroupKFold
 from sklearn.metrics import *
 from IPython.display import clear_output
+from sklearn.ensemble import VotingRegressor, VotingClassifier
+
 
 SEED = 42
 
 class AbdBase:
     
-    model_name = ["LGBM", "CAT", "XGB"]
+    model_name = ["LGBM", "CAT", "XGB","Voting"]
     metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse']
     regression_metrics = ["mae", "r2"]
     problem_types = ["classification", "regression"]
@@ -103,8 +105,8 @@ class AbdBase:
         else:
             raise ValueError(f"Unsupported metric '{self.metric}'")
 
-    def Train_ML(self, params, model_name, e_stop=50):
-        print(f"The Val of EarlyStopping is {e_stop}")
+    def Train_ML(self, params, model_name, e_stop=50,estimator=None):
+        print(f"The EarlyStopping is {e_stop}")
         if self.metric not in self.metrics:
             raise ValueError(f"Metric '{self.metric}' is not supported. Choose from Given Metrics.")
         if self.problem_type not in self.problem_types:
@@ -140,6 +142,8 @@ class AbdBase:
                 train_pool = Pool(data=X_train, label=y_train, cat_features=cat_features_indices)
                 val_pool = Pool(data=X_val, label=y_val, cat_features=cat_features_indices)
                 model = CatBoostClassifier(**params, random_state=self.seed, verbose=0) if self.problem_type == 'classification' else CatBoostRegressor(**params, random_state=self.seed, verbose=0)
+            elif model_name == 'Voting':
+                model = VotingClassifier(estimators=estimator) if self.problem_type == 'classification' else VotingRegressor(estimators=estimator)
             else:
                 raise ValueError("model_name must be 'LGBM' or 'CAT'.")
 
@@ -148,6 +152,8 @@ class AbdBase:
                 model.fit(X_train, y_train, eval_set=[(X_val, y_val)],callbacks=callbacks if self.early_stop else None)
             elif model_name == 'CAT':
                 model.fit(train_pool, eval_set=val_pool, early_stopping_rounds=e_stop if self.early_stop else None)
+            elif model_name == 'Voting':
+                model.fit(X_train, y_train)
 
             if self.problem_type == 'classification':
                 y_train_pred = model.predict_proba(X_train)[:, 1] if self.prob else model.predict(X_train)
