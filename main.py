@@ -4,6 +4,7 @@ import numpy as np
 from tqdm import tqdm
 from catboost import CatBoostClassifier, Pool, CatBoostRegressor
 import lightgbm as lgb
+from lightgbm import LGBMRegressor, early_stopping
 from sklearn.model_selection import StratifiedKFold, KFold, GroupKFold
 from sklearn.metrics import *
 from IPython.display import clear_output
