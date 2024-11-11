@@ -105,7 +105,7 @@ class AbdBase:
         else:
             raise ValueError(f"Unsupported metric '{self.metric}'")
 
-    def Train_ML(self, params, model_name, e_stop=50,estimator=None):
+    def Train_ML(self, params, model_name, e_stop=50,estimator=None,g_col=None):
         print(f"The EarlyStopping is {e_stop}")
         if self.metric not in self.metrics:
             raise ValueError(f"Metric '{self.metric}' is not supported. Choose from Given Metrics.")
@@ -129,12 +129,17 @@ class AbdBase:
             np.zeros((len(self.X_test), self.n_splits, self.num_classes)) if self.num_classes > 2 else
             np.zeros((len(self.X_test), self.n_splits))
         )
-
+        
         cat_features_indices = [self.X_train.columns.get_loc(col) for col in self.cat_features] if model_name == 'CAT' else None
-
-        for fold, (train_idx, val_idx) in enumerate(tqdm(kfold.split(self.X_train, self.y_train), desc="Training Folds", total=self.n_splits)):
-            X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
-            y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
+        
+        if self.fold_type == 'GKF': 
+            for fold, (train_idx, val_idx) in enumerate(tqdm(kfold.split(self.X_train, self.y_train, groups=g_col), desc="Training Folds", total=self.n_splits)):
+                X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
+                y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
+        else:
+            for fold, (train_idx, val_idx) in enumerate(tqdm(kfold.split(self.X_train, self.y_train), desc="Training Folds", total=self.n_splits)):
+                X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
+                y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
 
             if model_name == 'LGBM':
                 model = lgb.LGBMClassifier(**params, random_state=self.seed, verbose=-1) if self.problem_type == 'classification' else lgb.LGBMRegressor(**params, random_state=self.seed, verbose=-1)
