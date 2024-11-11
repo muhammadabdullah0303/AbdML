@@ -132,14 +132,10 @@ class AbdBase:
         
         cat_features_indices = [self.X_train.columns.get_loc(col) for col in self.cat_features] if model_name == 'CAT' else None
         
-        if self.fold_type == 'GKF': 
-            for fold, (train_idx, val_idx) in enumerate(tqdm(kfold.split(self.X_train, self.y_train, groups=self.X_train[g_col]), desc="Training Folds", total=self.n_splits)):
-                X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
-                y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
-        else:
-            for fold, (train_idx, val_idx) in enumerate(tqdm(kfold.split(self.X_train, self.y_train), desc="Training Folds", total=self.n_splits)):
-                X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
-                y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
+        for fold, (train_idx, val_idx) in enumerate(tqdm(kfold.split(self.X_train, self.y_train) if self.fold_type != 'GKF' else kfold.split(self.X_train, self.y_train, groups = self.X_train[g_col])
+                                                         , desc="Training Folds", total=self.n_splits)):
+            X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
+            y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
 
             if model_name == 'LGBM':
                 model = lgb.LGBMClassifier(**params, random_state=self.seed, verbose=-1) if self.problem_type == 'classification' else lgb.LGBMRegressor(**params, random_state=self.seed, verbose=-1)
