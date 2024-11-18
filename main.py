@@ -56,10 +56,12 @@ class AbdBase:
             raise ValueError('Encode Target First')
         
     def _display_initial_info(self):
+        print(" *** Available Settings *** \n")
         print("Available Models:", ", ".join(self.model_name))
         print("Available Metrics:", ", ".join(self.metrics))
         print("Available Problem Types:", ", ".join(self.problem_types))
         print("Available Fold Types:", ", ".join(self.cv_types))
+        print("\n *** Configuration *** \n")
         print(f"Problem Type Selected: {self.problem_type}")
         print(f"Metric Selected: {self.metric}")
         print(f"Fold Type Selected: {self.fold_type}")
