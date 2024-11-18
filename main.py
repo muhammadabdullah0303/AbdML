@@ -1,4 +1,5 @@
 
+# V_1.1
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
@@ -16,7 +17,7 @@ SEED = 42
 class AbdBase:
     
     model_name = ["LGBM", "CAT", "XGB","Voting"]
-    metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse']
+    metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse','wmae']
     regression_metrics = ["mae", "r2"]
     problem_types = ["classification", "regression"]
     cv_types = ['SKF', 'KF', 'GKF', 'GSKF']
@@ -24,7 +25,7 @@ class AbdBase:
     def __init__(self, train_data, test_data=None, target_column=None,
                  problem_type="classification", metric="roc_auc", seed=SEED,
                  n_splits=5, cat_features=None, num_classes=None, prob=True, 
-                 early_stop=False, test_prob=False, fold_type='SKF'):
+                 early_stop=False, test_prob=False, fold_type='SKF',test_w=None, train_w=None):
         self.train_data = train_data
         self.test_data = test_data
         self.target_column = target_column
@@ -38,6 +39,8 @@ class AbdBase:
         self.test_prob = test_prob
         self.early_stop = early_stop
         self.fold_type = fold_type
+        self.train_weights = train_w
+        self.test_weights = test_w
 
         self._validate_input()
         self.checkTarget()
@@ -84,8 +87,11 @@ class AbdBase:
         roc_auc_score, accuracy_score, f1_score, precision_score, recall_score, 
         mean_absolute_error, r2_score, mean_squared_error
     )
+    
+    def weighted_mean_absolute_error(self, y_true, y_pred, weights):
+        return np.sum(weights * np.abs(y_true - y_pred)) / np.sum(weights)
 
-    def get_metric(self, y_true, y_pred):
+    def get_metric(self, y_true, y_pred, weights=None):
         if self.metric == 'roc_auc':
             return roc_auc_score(y_true, y_pred, multi_class="ovr" if self.num_classes > 2 else None)
         elif self.metric == 'accuracy':
@@ -102,6 +108,8 @@ class AbdBase:
             return r2_score(y_true, y_pred)
         elif self.metric == 'rmse':
             return mean_squared_error(y_true, y_pred, squared=False)
+        elif self.metric == 'wmae' and weights is not None:
+            return self.weighted_mean_absolute_error(y_true, y_pred, weights)
         else:
             raise ValueError(f"Unsupported metric '{self.metric}'")
 
@@ -136,6 +144,13 @@ class AbdBase:
                                                          , desc="Training Folds", total=self.n_splits)):
             X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
             y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
+            
+            def distribute_test_weights(test_sample_size, weights):
+                repeated_weights = np.tile(weights, int(np.ceil(test_sample_size / len(weights))))[:test_sample_size]
+                return repeated_weights
+            
+            if self.test_weights is not None:
+                val_weights = distribute_test_weights(len(y_val), self.test_weights)
 
             if model_name == 'LGBM':
                 model = lgb.LGBMClassifier(**params, random_state=self.seed, verbose=-1) if self.problem_type == 'classification' else lgb.LGBMRegressor(**params, random_state=self.seed, verbose=-1)
@@ -171,6 +186,11 @@ class AbdBase:
             elif self.metric == "roc_auc":
                 train_scores.append(roc_auc_score(y_train, y_train_pred, multi_class="ovr" if self.num_classes > 2 else None))
                 oof_scores.append(roc_auc_score(y_val, y_val_pred, multi_class="ovr" if self.num_classes > 2 else None))
+                
+            elif self.metric == 'wmae' and self.test_weights is not None:
+                train_scores.append(self.get_metric(y_train, y_train_pred, np.ones(len(y_train))))
+                oof_scores.append(self.get_metric(y_val, y_val_pred, val_weights))
+
             else:
                 train_scores.append(self.get_metric(y_train, y_train_pred))
                 oof_scores.append(self.get_metric(y_val, y_val_pred))
