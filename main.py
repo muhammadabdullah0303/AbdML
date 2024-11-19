@@ -10,6 +10,8 @@ from sklearn.model_selection import StratifiedKFold, KFold, GroupKFold
 from sklearn.metrics import *
 from IPython.display import clear_output
 from sklearn.ensemble import VotingRegressor, VotingClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import TruncatedSVD
 
 
 SEED = 42
@@ -22,10 +24,11 @@ class AbdBase:
     problem_types = ["classification", "regression"]
     cv_types = ['SKF', 'KF', 'GKF', 'GSKF']
     
-    def __init__(self, train_data, test_data=None, target_column=None,
+    def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,
                  problem_type="classification", metric="roc_auc", seed=SEED,
                  n_splits=5, cat_features=None, num_classes=None, prob=True, 
                  early_stop=False, test_prob=False, fold_type='SKF',test_w=None, train_w=None):
+
         self.train_data = train_data
         self.test_data = test_data
         self.target_column = target_column
@@ -41,6 +44,30 @@ class AbdBase:
         self.fold_type = fold_type
         self.train_weights = train_w
         self.test_weights = test_w
+        self.tf_vec = tf_vec
+        
+        if self.tf_vec: 
+            self.text_column = tf_vec.get('text_column', '')
+            self.max_features = tf_vec.get('max_features', 1000)
+            self.n_components = tf_vec.get('n_components', 10)
+
+        if self.train_data is not None:
+                self.train_data = self.apply_tfidf_svd(
+                    df=self.train_data,
+                    text_column=self.text_column,
+                    max_features=self.max_features,
+                    n_components=self.n_components
+                )
+
+        if self.test_data is not None:
+                self.test_data = self.apply_tfidf_svd(
+                    df=self.test_data,
+                    text_column=self.text_column,
+                    max_features=self.max_features,
+                    n_components=self.n_components
+                )
+        else:
+            print("TF-IDF and SVD not applied as tf_vec is not provided.")
 
         self._validate_input()
         self.checkTarget()
@@ -50,6 +77,19 @@ class AbdBase:
         self.X_test = self.test_data if self.test_data is not None else None
         
         self._display_initial_info()
+    @staticmethod              
+    def apply_tfidf_svd(df, text_column, max_features=1000, n_components=10):
+            vectorizer = TfidfVectorizer(max_features=max_features, stop_words='english')
+            vectors = vectorizer.fit_transform(df[text_column])
+            svd = TruncatedSVD(n_components)
+            x_sv = svd.fit_transform(vectors)
+            tfidf_df = pd.DataFrame(x_sv)
+            cols = [(text_column + "_tfidf_" + str(f)) for f in tfidf_df.columns.to_list()]
+            tfidf_df.columns = cols
+            df = df.reset_index(drop=True)
+            df = pd.concat([df, tfidf_df], axis="columns")
+            df.drop(text_column, axis=1, inplace=True)
+            return df
 
     def checkTarget(self):
         if self.train_data[self.target_column].dtype == 'object':
