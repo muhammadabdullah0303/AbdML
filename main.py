@@ -24,7 +24,7 @@ class AbdBase:
     problem_types = ["classification", "regression"]
     cv_types = ['SKF', 'KF', 'GKF', 'GSKF']
     
-    def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,
+    def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,
                  problem_type="classification", metric="roc_auc", seed=SEED,
                  n_splits=5, cat_features=None, num_classes=None, prob=True, 
                  early_stop=False, test_prob=False, fold_type='SKF',weights=None):
@@ -44,27 +44,28 @@ class AbdBase:
         self.fold_type = fold_type
         self.weights = weights
         self.tf_vec = tf_vec
+        self.gpu = gpu
         
         if self.tf_vec: 
             self.text_column = tf_vec.get('text_column', '')
             self.max_features = tf_vec.get('max_features', 1000)
             self.n_components = tf_vec.get('n_components', 10)
 
-        if self.train_data is not None:
-                self.train_data = self.apply_tfidf_svd(
-                    df=self.train_data,
-                    text_column=self.text_column,
-                    max_features=self.max_features,
-                    n_components=self.n_components
-                )
+            if self.train_data is not None:
+                    self.train_data = self.apply_tfidf_svd(
+                        df=self.train_data,
+                        text_column=self.text_column,
+                        max_features=self.max_features,
+                        n_components=self.n_components
+                    )
 
-        if self.test_data is not None:
-                self.test_data = self.apply_tfidf_svd(
-                    df=self.test_data,
-                    text_column=self.text_column,
-                    max_features=self.max_features,
-                    n_components=self.n_components
-                )
+            if self.test_data is not None:
+                    self.test_data = self.apply_tfidf_svd(
+                        df=self.test_data,
+                        text_column=self.text_column,
+                        max_features=self.max_features,
+                        n_components=self.n_components
+                    )
         else:
             print("TF-IDF and SVD not applied as tf_vec is not provided.")
 
@@ -107,6 +108,8 @@ class AbdBase:
         print(f"Calculate Train Probabilities: {self.prob}")
         print(f"Calculate Test Probabilities: {self.test_prob}")
         print(f"Early Stopping: {self.early_stop}")
+        print(f"GPU : {self.gpu}")
+
 
     def _validate_input(self):
         if not isinstance(self.train_data, pd.DataFrame):
@@ -196,11 +199,13 @@ class AbdBase:
 #                 val_weights = distribute_test_weights(len(y_val), self.test_weights) # If Test Weights are Less || Sample Thm
 
             if model_name == 'LGBM':
-                model = lgb.LGBMClassifier(**params, random_state=self.seed, verbose=-1) if self.problem_type == 'classification' else lgb.LGBMRegressor(**params, random_state=self.seed, verbose=-1)
+                model = lgb.LGBMClassifier(**params, random_state=self.seed, verbose=-1,device='gpu' if self.gpu else 'cpu') if self.problem_type == 'classification' else lgb.LGBMRegressor(**params, random_state=self.seed, verbose=-1,
+                device='gpu' if self.gpu else 'cpu')
             elif model_name == 'CAT':
                 train_pool = Pool(data=X_train, label=y_train, cat_features=cat_features_indices)
                 val_pool = Pool(data=X_val, label=y_val, cat_features=cat_features_indices)
-                model = CatBoostClassifier(**params, random_state=self.seed, verbose=0) if self.problem_type == 'classification' else CatBoostRegressor(**params, random_state=self.seed, verbose=0)
+                model = CatBoostClassifier(**params, random_state=self.seed, verbose=0,task_type='GPU' if self.gpu else 'cpu') if self.problem_type == 'classification' else CatBoostRegressor(**params, random_state=self.seed, verbose=0,
+                task_type='GPU' if self.gpu else 'cpu')
             elif model_name == 'Voting':
                 model = VotingClassifier(estimators=estimator) if self.problem_type == 'classification' else VotingRegressor(estimators=estimator)
             else:
