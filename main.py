@@ -12,6 +12,7 @@ from IPython.display import clear_output
 from sklearn.ensemble import VotingRegressor, VotingClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD
+from colorama import Fore
 
 
 SEED = 42
@@ -94,19 +95,21 @@ class AbdBase:
             raise ValueError('Encode Target First')
         
     def _display_initial_info(self):
-        print(" *** Available Settings *** \n")
-        print("Available Models:", ", ".join(self.model_name))
-        print("Available Metrics:", ", ".join(self.metrics))
-        print("Available Problem Types:", ", ".join(self.problem_types))
-        print("Available Fold Types:", ", ".join(self.cv_types))
-        print("\n *** Configuration *** \n")
-        print(f"Problem Type Selected: {self.problem_type}")
-        print(f"Metric Selected: {self.metric}")
-        print(f"Fold Type Selected: {self.fold_type}")
-        print(f"Calculate Train Probabilities: {self.prob}")
-        print(f"Calculate Test Probabilities: {self.test_prob}")
-        print(f"Early Stopping: {self.early_stop}")
-        print(f"GPU : {self.gpu}")
+        print(Fore.RED + "*** AbdBase V_1.1 ***\n")
+        print(Fore.RED + " *** Available Settings *** \n")
+        print(Fore.RED + "Available Models:", ", ".join([Fore.CYAN + model for model in self.model_name]))
+        print(Fore.RED + "Available Metrics:", ", ".join([Fore.CYAN + metric for metric in self.metrics]))
+        print(Fore.RED + "Available Problem Types:", ", ".join([Fore.CYAN + problem for problem in self.problem_types]))
+        print(Fore.RED + "Available Fold Types:", ", ".join([Fore.CYAN + fold for fold in self.cv_types]))
+
+        print(Fore.RED + "\n *** Configuration *** \n")
+        print(Fore.RED + f"Problem Type Selected: {Fore.CYAN + self.problem_type.upper()}")
+        print(Fore.RED + f"Metric Selected: {Fore.CYAN + self.metric.upper()}")
+        print(Fore.RED + f"Fold Type Selected: {Fore.CYAN + self.fold_type}")
+        print(Fore.RED + f"Calculate Train Probabilities: {Fore.CYAN + str(self.prob)}")  
+        print(Fore.RED + f"Calculate Test Probabilities: {Fore.CYAN + str(self.test_prob)}")  
+        print(Fore.RED + f"Early Stopping: {Fore.CYAN + str(self.early_stop)}")  
+        print(Fore.RED + f"GPU: {Fore.CYAN + str(self.gpu)}")
 
 
     def _validate_input(self):
