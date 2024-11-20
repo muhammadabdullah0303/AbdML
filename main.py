@@ -27,7 +27,7 @@ class AbdBase:
     def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,
                  problem_type="classification", metric="roc_auc", seed=SEED,
                  n_splits=5, cat_features=None, num_classes=None, prob=True, 
-                 early_stop=False, test_prob=False, fold_type='SKF',test_w=None, train_w=None):
+                 early_stop=False, test_prob=False, fold_type='SKF',weights=None):
 
         self.train_data = train_data
         self.test_data = test_data
@@ -42,8 +42,7 @@ class AbdBase:
         self.test_prob = test_prob
         self.early_stop = early_stop
         self.fold_type = fold_type
-        self.train_weights = train_w
-        self.test_weights = test_w
+        self.weights = weights
         self.tf_vec = tf_vec
         
         if self.tf_vec: 
@@ -187,12 +186,14 @@ class AbdBase:
             X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
             y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
             
+            # Sample The Test Weights
             def distribute_test_weights(test_sample_size, weights):
                 repeated_weights = np.tile(weights, int(np.ceil(test_sample_size / len(weights))))[:test_sample_size]
                 return repeated_weights
             
-            if self.test_weights is not None:
-                val_weights = distribute_test_weights(len(y_val), self.test_weights)
+            if self.weights is not None:
+                train_weights, val_weights = self.weights.iloc[train_idx], self.weights.iloc[val_idx]
+#                 val_weights = distribute_test_weights(len(y_val), self.test_weights) # If Test Weights are Less || Sample Thm
 
             if model_name == 'LGBM':
                 model = lgb.LGBMClassifier(**params, random_state=self.seed, verbose=-1) if self.problem_type == 'classification' else lgb.LGBMRegressor(**params, random_state=self.seed, verbose=-1)
@@ -229,8 +230,8 @@ class AbdBase:
                 train_scores.append(roc_auc_score(y_train, y_train_pred, multi_class="ovr" if self.num_classes > 2 else None))
                 oof_scores.append(roc_auc_score(y_val, y_val_pred, multi_class="ovr" if self.num_classes > 2 else None))
                 
-            elif self.metric == 'wmae' and self.test_weights is not None:
-                train_scores.append(self.get_metric(y_train, y_train_pred, np.ones(len(y_train))))
+            elif self.metric == 'wmae' and self.weights is not None:
+                train_scores.append(self.get_metric(y_train, y_train_pred, train_weights))
                 oof_scores.append(self.get_metric(y_val, y_val_pred, val_weights))
 
             else:
