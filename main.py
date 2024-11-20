@@ -1,4 +1,3 @@
-
 # V_1.1
 import pandas as pd
 import numpy as np
@@ -13,6 +12,9 @@ from sklearn.ensemble import VotingRegressor, VotingClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD
 from colorama import Fore
+from nltk.corpus import stopwords
+import nltk
+import string
 
 
 SEED = 42
@@ -27,7 +29,7 @@ class AbdBase:
     
     def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,
                  problem_type="classification", metric="roc_auc", seed=SEED,
-                 n_splits=5, cat_features=None, num_classes=None, prob=False, 
+                 n_splits=5, cat_features=None, num_classes=None, prob=False,stat_fe = None,
                  early_stop=False, test_prob=False, fold_type='SKF',weights=None):
 
         self.train_data = train_data
@@ -45,13 +47,18 @@ class AbdBase:
         self.fold_type = fold_type
         self.weights = weights
         self.tf_vec = tf_vec
+        self.stat_fe = stat_fe
         self.gpu = gpu
+        
+        self._validate_input()
+        self.checkTarget()
+        self._display_initial_info()
         
         if self.tf_vec: 
             self.text_column = tf_vec.get('text_column', '')
             self.max_features = tf_vec.get('max_features', 1000)
             self.n_components = tf_vec.get('n_components', 10)
-
+            print(Fore.YELLOW + f"\nTf-IDF Processing For Col: {self.text_column}")
             if self.train_data is not None:
                     self.train_data = self.apply_tfidf_svd(
                         df=self.train_data,
@@ -67,15 +74,51 @@ class AbdBase:
                         max_features=self.max_features,
                         n_components=self.n_components
                     )
+                    
+        if self.stat_fe: 
+            print(Fore.YELLOW + f"\nAdding Stats Features")
+            self.txt_columns = stat_fe.get('txt_columns', txt_columns)
 
-        self._validate_input()
-        self.checkTarget()
+            if self.train_data is not None:
+                    self.train_data = self.text_stat(
+                        df=self.train_data,
+                        txt_cols=self.txt_columns,
+                    )
+
+            if self.test_data is not None:
+                    self.test_data = self.text_stat(
+                        df=self.test_data,
+                        txt_cols=self.txt_columns,
+                    )
         
         self.X_train = self.train_data.drop(self.target_column, axis=1)
         self.y_train = self.train_data[self.target_column]
         self.X_test = self.test_data if self.test_data is not None else None
-        
-        self._display_initial_info()
+                
+    @staticmethod
+    def text_stat(df, txt_cols):
+        stop_words = set(stopwords.words('english'))
+        for col in tqdm(txt_cols, desc="Processing text columns"):
+            if col not in df.columns:
+                print(f"Warning: Column '{col}' not found in DataFrame.")
+                continue
+
+            df[col] = df[col].fillna("")
+            df[f'{col}_length'] = df[col].str.len()
+            df[f'{col}_word_count'] = df[col].str.split().str.len()
+            df[f'{col}_char_count'] = df[col].apply(lambda x: sum(len(word) for word in x.split()))
+            df[f'{col}_avg_word_length'] = df[f'{col}_char_count'] / df[f'{col}_word_count'].replace(0, 1)
+
+            df[f'{col}_punctuation_count'] = df[col].apply(lambda x: sum(1 for char in x if char in string.punctuation))
+            df[f'{col}_capitalized_count'] = df[col].apply(lambda x: sum(1 for word in x.split() if word.isupper()))
+            df[f'{col}_special_char_count'] = df[col].apply(lambda x: sum(1 for char in x if not char.isalnum() and not char.isspace()))
+            df[f'{col}_stopwords_count'] = df[col].apply(lambda x: sum(1 for word in x.split() if word.lower() in stop_words))
+
+            df[f'{col}_unique_word_count'] = df[col].apply(lambda x: len(set(x.split())))
+            df[f'{col}_lexical_diversity'] = df[f'{col}_unique_word_count'] / df[f'{col}_word_count'].replace(0, 1)
+
+        return df
+
     @staticmethod              
     def apply_tfidf_svd(df, text_column, max_features=1000, n_components=10):
             vectorizer = TfidfVectorizer(max_features=max_features, stop_words='english')
