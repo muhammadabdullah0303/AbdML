@@ -66,8 +66,6 @@ class AbdBase:
                         max_features=self.max_features,
                         n_components=self.n_components
                     )
-        else:
-            print("TF-IDF and SVD not applied as tf_vec is not provided.")
 
         self._validate_input()
         self.checkTarget()
@@ -195,9 +193,10 @@ class AbdBase:
                 return repeated_weights
             
             if self.weights is not None:
-                train_weights, val_weights = self.weights.iloc[train_idx], self.weights.iloc[val_idx]
-#                 val_weights = distribute_test_weights(len(y_val), self.test_weights) # If Test Weights are Less || Sample Thm
-
+#                 train_weights, val_weights = self.weights.iloc[train_idx], self.weights.iloc[val_idx]
+                val_weights = distribute_test_weights(len(y_val), self.weights) # If Test Weights are Less || Sample Thm
+                train_weights = np.ones(len(y_train)) # If Train Weights are None 
+        
             if model_name == 'LGBM':
                 model = lgb.LGBMClassifier(**params, random_state=self.seed, verbose=-1,device='gpu' if self.gpu else 'cpu') if self.problem_type == 'classification' else lgb.LGBMRegressor(**params, random_state=self.seed, verbose=-1,
                 device='gpu' if self.gpu else 'cpu')
