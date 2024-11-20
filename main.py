@@ -27,7 +27,7 @@ class AbdBase:
     
     def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,
                  problem_type="classification", metric="roc_auc", seed=SEED,
-                 n_splits=5, cat_features=None, num_classes=None, prob=True, 
+                 n_splits=5, cat_features=None, num_classes=None, prob=False, 
                  early_stop=False, test_prob=False, fold_type='SKF',weights=None):
 
         self.train_data = train_data
