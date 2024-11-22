@@ -30,7 +30,7 @@ class AbdBase:
     def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,
                  problem_type="classification", metric="roc_auc", seed=SEED,
                  n_splits=5, cat_features=None, num_classes=None, prob=False,stat_fe = None,
-                 early_stop=False, test_prob=False, fold_type='SKF',weights=None):
+                 early_stop=False, test_prob=False, fold_type='SKF',weights=None,multi_column_tfidf=None):
 
         self.train_data = train_data
         self.test_data = test_data
@@ -48,6 +48,7 @@ class AbdBase:
         self.weights = weights
         self.tf_vec = tf_vec
         self.stat_fe = stat_fe
+        self.multi_column_tfidf = multi_column_tfidf
         self.gpu = gpu
         
         self._validate_input()
@@ -90,6 +91,21 @@ class AbdBase:
                         df=self.test_data,
                         txt_cols=self.txt_columns,
                     )
+                    
+        if self.multi_column_tfidf:
+
+            self.text_columns = multi_column_tfidf.get('text_columns', [])
+            self.max_features = multi_column_tfidf.get('max_features', 1000)
+
+            print(Fore.YELLOW + f"\nMulti-TF_IDF Processing For Columns: {self.text_columns}")
+
+            if self.train_data is not None and self.test_data is not None:
+                self.train_data, self.test_data = self.tf_fe(
+                    train=self.train_data,
+                    test=self.test_data,
+                    text_columns=self.text_columns, 
+                    max_features=self.max_features,
+                )
         
         self.X_train = self.train_data.drop(self.target_column, axis=1)
         self.y_train = self.train_data[self.target_column]
@@ -132,6 +148,27 @@ class AbdBase:
             df = pd.concat([df, tfidf_df], axis="columns")
             df.drop(text_column, axis=1, inplace=True)
             return df
+    @staticmethod       
+    def tf_fe(train, test, text_columns, max_features=3000, analyzer='char_wb'):
+
+        train_features = []
+        test_features = []
+
+        for col in tqdm(text_columns, desc="Processing text columns", unit="col"):
+            train[col] = train[col].fillna("")
+            test[col] = test[col].fillna("")  
+            vectorizer = TfidfVectorizer(analyzer=analyzer, max_features=max_features)
+            train_tfidf_col = vectorizer.fit_transform(train[col])
+            test_tfidf_col = vectorizer.transform(test[col])
+            train_tfidf_col = pd.DataFrame(train_tfidf_col.toarray(), columns=[f"tfidf_{col}_{i}" for i in range(train_tfidf_col.shape[1])])
+            test_tfidf_col = pd.DataFrame(test_tfidf_col.toarray(), columns=[f"tfidf_{col}_{i}" for i in range(test_tfidf_col.shape[1])])
+            train_features.append(train_tfidf_col)
+            test_features.append(test_tfidf_col)
+
+        train_with_tfidf = pd.concat([train, *train_features], axis=1)
+        test_with_tfidf = pd.concat([test, *test_features], axis=1)
+
+        return train_with_tfidf, test_with_tfidf
 
     def checkTarget(self):
         if self.train_data[self.target_column].dtype == 'object':
@@ -301,4 +338,4 @@ class AbdBase:
         print(f"Overall OOF {self.metric.upper()}: {np.mean(oof_scores):.4f}")
 
         mean_test_preds = test_preds.mean(axis=1) if self.X_test is not None else None
-        return oof_predictions, mean_test_preds
+        return oof_predictions, mean_test_preds , model, 
