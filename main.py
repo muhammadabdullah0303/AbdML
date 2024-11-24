@@ -1,4 +1,4 @@
-# V_1.1
+# V_1.2
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
@@ -8,6 +8,7 @@ from lightgbm import LGBMRegressor, early_stopping
 from sklearn.model_selection import StratifiedKFold, KFold, GroupKFold
 from sklearn.metrics import *
 from IPython.display import clear_output
+from xgboost import XGBRegressor,XGBClassifier
 from sklearn.ensemble import VotingRegressor, VotingClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD
@@ -26,6 +27,7 @@ class AbdBase:
     regression_metrics = ["mae", "r2"]
     problem_types = ["classification", "regression"]
     cv_types = ['SKF', 'KF', 'GKF', 'GSKF']
+    current_version = ['V_1.2']
     
     def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,
                  problem_type="classification", metric="roc_auc", seed=SEED,
@@ -175,7 +177,7 @@ class AbdBase:
             raise ValueError('Encode Target First')
         
     def _display_initial_info(self):
-        print(Fore.RED + "*** AbdBase V_1.1 ***\n")
+        print(Fore.RED + f"*** AbdBase {self.current_version} ***\n")
         print(Fore.RED + " *** Available Settings *** \n")
         print(Fore.RED + "Available Models:", ", ".join([Fore.CYAN + model for model in self.model_name]))
         print(Fore.RED + "Available Metrics:", ", ".join([Fore.CYAN + metric for metric in self.metrics]))
@@ -256,6 +258,7 @@ class AbdBase:
 
         train_scores = []
         oof_scores = []
+        all_models = []
         oof_predictions = np.zeros((len(self.y_train), self.num_classes)) if self.num_classes > 2 else np.zeros(len(self.y_train))
         test_preds = (
             None if self.X_test is None else
@@ -283,6 +286,9 @@ class AbdBase:
             if model_name == 'LGBM':
                 model = lgb.LGBMClassifier(**params, random_state=self.seed, verbose=-1,device='gpu' if self.gpu else 'cpu') if self.problem_type == 'classification' else lgb.LGBMRegressor(**params, random_state=self.seed, verbose=-1,
                 device='gpu' if self.gpu else 'cpu')
+            elif model_name == 'XGB':
+                model = XGBClassifier(**params, random_state=self.seed, verbose=-1,tree_method='gpu_hist' if self.gpu else 'cpu') if self.problem_type == 'classification' else XGBRegressor(**params, random_state=self.seed, verbose=-1,
+                tree_method='gpu_hist' if self.gpu else 'hist')
             elif model_name == 'CAT':
                 train_pool = Pool(data=X_train, label=y_train, cat_features=cat_features_indices)
                 val_pool = Pool(data=X_val, label=y_val, cat_features=cat_features_indices)
@@ -296,6 +302,8 @@ class AbdBase:
             callbacks = [early_stopping(stopping_rounds=e_stop, verbose=False)]
             if model_name == 'LGBM':
                 model.fit(X_train, y_train, eval_set=[(X_val, y_val)],callbacks=callbacks if self.early_stop else None)
+            elif model_name == 'XGB':
+                model.fit(X_train, y_train, eval_set=[(X_val, y_val)],early_stopping_rounds=e_stop if self.early_stop else None,verbose=False)
             elif model_name == 'CAT':
                 model.fit(train_pool, eval_set=val_pool, early_stopping_rounds=e_stop if self.early_stop else None)
             elif model_name == 'Voting':
@@ -332,10 +340,11 @@ class AbdBase:
                     test_preds[:, fold] = model.predict(self.X_test)
 
             print(f"Fold {fold + 1} - Train {self.metric.upper()}: {train_scores[-1]:.4f}, OOF {self.metric.upper()}: {oof_scores[-1]:.4f}")
+            all_models.append(model)
             clear_output(wait=True)
 
         print(f"Overall Train {self.metric.upper()}: {np.mean(train_scores):.4f}")
         print(f"Overall OOF {self.metric.upper()}: {np.mean(oof_scores):.4f}")
 
         mean_test_preds = test_preds.mean(axis=1) if self.X_test is not None else None
-        return oof_predictions, mean_test_preds
+        return oof_predictions, mean_test_preds , model , all_models
