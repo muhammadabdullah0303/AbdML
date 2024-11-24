@@ -338,4 +338,4 @@ class AbdBase:
         print(f"Overall OOF {self.metric.upper()}: {np.mean(oof_scores):.4f}")
 
         mean_test_preds = test_preds.mean(axis=1) if self.X_test is not None else None
-        return oof_predictions, mean_test_preds , model, 
+        return oof_predictions, mean_test_preds
