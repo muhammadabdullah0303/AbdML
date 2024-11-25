@@ -1,8 +1,10 @@
-# V_1.2
+# V_1.3 # Include TabNET
+!pip install -qq pytorch_tabnet
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from catboost import CatBoostClassifier, Pool, CatBoostRegressor
+from pytorch_tabnet.tab_model import TabNetRegressor,TabNetClassifier
 import lightgbm as lgb
 from lightgbm import LGBMRegressor, early_stopping
 from sklearn.model_selection import StratifiedKFold, KFold, GroupKFold
@@ -22,14 +24,14 @@ SEED = 42
 
 class AbdBase:
     
-    model_name = ["LGBM", "CAT", "XGB","Voting"]
+    model_name = ["LGBM", "CAT", "XGB","Voting",'TABNET']
     metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse','wmae']
     regression_metrics = ["mae", "r2"]
     problem_types = ["classification", "regression"]
     cv_types = ['SKF', 'KF', 'GKF', 'GSKF']
-    current_version = ['V_1.2']
+    current_version = ['V_1.3']
     
-    def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,
+    def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,series_data=False,
                  problem_type="classification", metric="roc_auc", seed=SEED,
                  n_splits=5, cat_features=None, num_classes=None, prob=False,stat_fe = None,
                  early_stop=False, test_prob=False, fold_type='SKF',weights=None,multi_column_tfidf=None):
@@ -52,6 +54,7 @@ class AbdBase:
         self.stat_fe = stat_fe
         self.multi_column_tfidf = multi_column_tfidf
         self.gpu = gpu
+        self.series_data = series_data
         
         self._validate_input()
         self.checkTarget()
@@ -108,10 +111,17 @@ class AbdBase:
                     text_columns=self.text_columns, 
                     max_features=self.max_features,
                 )
+
+
+        self.X_train = self.train_data.drop(self.target_column, axis=1).to_numpy() if self.series_data else self.train_data.drop(self.target_column, axis=1)
+        self.y_train = self.train_data[self.target_column].to_numpy() if self.series_data else self.train_data[self.target_column]
+        self.y_train = self.y_train.reshape(-1, 1) if self.problem_type == 'regression' else self.y_train
         
-        self.X_train = self.train_data.drop(self.target_column, axis=1)
-        self.y_train = self.train_data[self.target_column]
-        self.X_test = self.test_data if self.test_data is not None else None
+        if self.test_data is not None:
+            self.X_test = self.test_data.to_numpy() if self.series_data else self.test_data
+        else:
+            self.X_test = None
+
                 
     @staticmethod
     def text_stat(df, txt_cols):
@@ -240,7 +250,7 @@ class AbdBase:
         else:
             raise ValueError(f"Unsupported metric '{self.metric}'")
 
-    def Train_ML(self, params, model_name, e_stop=50,estimator=None,g_col=None):
+    def Train_ML(self, params, model_name, e_stop=50,estimator=None,g_col=None,tab_net_train_params=None):
         print(f"The EarlyStopping is {e_stop}")
         if self.metric not in self.metrics:
             raise ValueError(f"Metric '{self.metric}' is not supported. Choose from Given Metrics.")
@@ -270,8 +280,12 @@ class AbdBase:
         
         for fold, (train_idx, val_idx) in enumerate(tqdm(kfold.split(self.X_train, self.y_train) if self.fold_type != 'GKF' else kfold.split(self.X_train, self.y_train, groups = self.X_train[g_col])
                                                          , desc="Training Folds", total=self.n_splits)):
-            X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
-            y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
+            if self.series_data:
+                X_train, X_val = self.X_train[train_idx], self.X_train[val_idx]
+                y_train, y_val = self.y_train[train_idx], self.y_train[val_idx]
+            else:
+                X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
+                y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
             
             # Sample The Test Weights
             def distribute_test_weights(test_sample_size, weights):
@@ -286,6 +300,9 @@ class AbdBase:
             if model_name == 'LGBM':
                 model = lgb.LGBMClassifier(**params, random_state=self.seed, verbose=-1,device='gpu' if self.gpu else 'cpu') if self.problem_type == 'classification' else lgb.LGBMRegressor(**params, random_state=self.seed, verbose=-1,
                 device='gpu' if self.gpu else 'cpu')
+            elif model_name == 'TABNET':
+                model = TabNetClassifier(**params, seed=self.seed, verbose=-1,device_name='gpu' if self.gpu else 'cpu') if self.problem_type == 'classification' else TabNetRegressor(**params, seed=self.seed, verbose=-1,
+                device_name='gpu' if self.gpu else 'cpu')
             elif model_name == 'XGB':
                 model = XGBClassifier(**params, random_state=self.seed, verbose=-1,tree_method='gpu_hist' if self.gpu else 'cpu') if self.problem_type == 'classification' else XGBRegressor(**params, random_state=self.seed, verbose=-1,
                 tree_method='gpu_hist' if self.gpu else 'hist')
@@ -302,6 +319,8 @@ class AbdBase:
             callbacks = [early_stopping(stopping_rounds=e_stop, verbose=False)]
             if model_name == 'LGBM':
                 model.fit(X_train, y_train, eval_set=[(X_val, y_val)],callbacks=callbacks if self.early_stop else None)
+            if model_name == 'TABNET':
+                model.fit(X_train, y_train, eval_set=[(X_val, y_val)],**tab_net_train_params)
             elif model_name == 'XGB':
                 model.fit(X_train, y_train, eval_set=[(X_val, y_val)],early_stopping_rounds=e_stop if self.early_stop else None,verbose=False)
             elif model_name == 'CAT':
@@ -336,6 +355,9 @@ class AbdBase:
             if self.X_test is not None:
                 if self.problem_type == 'classification':
                     test_preds[:, fold] = model.predict_proba(self.X_test)[:, 1] if self.test_prob else model.predict(self.X_test)
+                elif model_name == 'TABNET':
+                    pred = model.predict(self.X_test)
+                    test_preds[:, fold] = pred.squeeze() 
                 else:
                     test_preds[:, fold] = model.predict(self.X_test)
 
