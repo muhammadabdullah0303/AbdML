@@ -1,5 +1,5 @@
 # V_1.3 # Include TabNET + OPTUNA Tunning
-!pip install -qq pytorch_tabnet
+# !pip install -qq pytorch_tabnet
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
