@@ -1,4 +1,4 @@
-# V_1.3 # Include TabNET
+# V_1.3 # Include TabNET + OPTUNA Tunning
 !pip install -qq pytorch_tabnet
 import pandas as pd
 import numpy as np
@@ -18,6 +18,13 @@ from colorama import Fore
 from nltk.corpus import stopwords
 import nltk
 import string
+import optuna
+import warnings
+warnings.simplefilter('ignore')
+import optuna
+from typing import Dict, Any, Optional, Union, Tuple
+from colorama import Fore
+import logging
 
 
 SEED = 42
@@ -31,9 +38,9 @@ class AbdBase:
     cv_types = ['SKF', 'KF', 'GKF', 'GSKF']
     current_version = ['V_1.3']
     
-    def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,series_data=False,
+    def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,numpy_data=False,
                  problem_type="classification", metric="roc_auc", seed=SEED,
-                 n_splits=5, cat_features=None, num_classes=None, prob=False,stat_fe = None,
+                 n_splits=5, cat_features=None, num_classes=None, prob=False,stat_fe = None,logger: Optional[logging.Logger] = None,
                  early_stop=False, test_prob=False, fold_type='SKF',weights=None,multi_column_tfidf=None):
 
         self.train_data = train_data
@@ -54,7 +61,8 @@ class AbdBase:
         self.stat_fe = stat_fe
         self.multi_column_tfidf = multi_column_tfidf
         self.gpu = gpu
-        self.series_data = series_data
+        self.numpy_data = numpy_data
+        self.logger = logger or self._setup_default_logger()
         
         self._validate_input()
         self.checkTarget()
@@ -113,12 +121,12 @@ class AbdBase:
                 )
 
 
-        self.X_train = self.train_data.drop(self.target_column, axis=1).to_numpy() if self.series_data else self.train_data.drop(self.target_column, axis=1)
-        self.y_train = self.train_data[self.target_column].to_numpy() if self.series_data else self.train_data[self.target_column]
+        self.X_train = self.train_data.drop(self.target_column, axis=1).to_numpy() if self.numpy_data else self.train_data.drop(self.target_column, axis=1)
+        self.y_train = self.train_data[self.target_column].to_numpy() if self.numpy_data else self.train_data[self.target_column]
         self.y_train = self.y_train.reshape(-1, 1) if self.problem_type == 'regression' else self.y_train
         
         if self.test_data is not None:
-            self.X_test = self.test_data.to_numpy() if self.series_data else self.test_data
+            self.X_test = self.test_data.to_numpy() if self.numpy_data else self.test_data
         else:
             self.X_test = None
 
@@ -250,8 +258,8 @@ class AbdBase:
         else:
             raise ValueError(f"Unsupported metric '{self.metric}'")
 
-    def Train_ML(self, params, model_name, e_stop=50,estimator=None,g_col=None,tab_net_train_params=None):
-        print(f"The EarlyStopping is {e_stop}")
+    def Train_ML(self, params, model_name, e_stop=50,estimator=None,g_col=None,tab_net_train_params=None,optuna=False):
+        print(f"The EarlyStopping is {e_stop}") if optuna == False else None
         if self.metric not in self.metrics:
             raise ValueError(f"Metric '{self.metric}' is not supported. Choose from Given Metrics.")
         if self.problem_type not in self.problem_types:
@@ -280,7 +288,7 @@ class AbdBase:
         
         for fold, (train_idx, val_idx) in enumerate(tqdm(kfold.split(self.X_train, self.y_train) if self.fold_type != 'GKF' else kfold.split(self.X_train, self.y_train, groups = self.X_train[g_col])
                                                          , desc="Training Folds", total=self.n_splits)):
-            if self.series_data:
+            if self.numpy_data:
                 X_train, X_val = self.X_train[train_idx], self.X_train[val_idx]
                 y_train, y_val = self.y_train[train_idx], self.y_train[val_idx]
             else:
@@ -304,7 +312,7 @@ class AbdBase:
                 model = TabNetClassifier(**params, seed=self.seed, verbose=-1,device_name='gpu' if self.gpu else 'cpu') if self.problem_type == 'classification' else TabNetRegressor(**params, seed=self.seed, verbose=-1,
                 device_name='gpu' if self.gpu else 'cpu')
             elif model_name == 'XGB':
-                model = XGBClassifier(**params, random_state=self.seed, verbose=-1,tree_method='gpu_hist' if self.gpu else 'cpu') if self.problem_type == 'classification' else XGBRegressor(**params, random_state=self.seed, verbose=-1,
+                model = XGBClassifier(**params, random_state=self.seed, verbose=-1,tree_method='gpu_hist' if self.gpu else 'hist') if self.problem_type == 'classification' else XGBRegressor(**params, random_state=self.seed, verbose=-1,
                 tree_method='gpu_hist' if self.gpu else 'hist')
             elif model_name == 'CAT':
                 train_pool = Pool(data=X_train, label=y_train, cat_features=cat_features_indices)
@@ -361,12 +369,107 @@ class AbdBase:
                 else:
                     test_preds[:, fold] = model.predict(self.X_test)
 
-            print(f"Fold {fold + 1} - Train {self.metric.upper()}: {train_scores[-1]:.4f}, OOF {self.metric.upper()}: {oof_scores[-1]:.4f}")
+            print(f"Fold {fold + 1} - Train {self.metric.upper()}: {train_scores[-1]:.4f}, OOF {self.metric.upper()}: {oof_scores[-1]:.4f}") if optuna == False else None
             all_models.append(model)
-            clear_output(wait=True)
-
-        print(f"Overall Train {self.metric.upper()}: {np.mean(train_scores):.4f}")
-        print(f"Overall OOF {self.metric.upper()}: {np.mean(oof_scores):.4f}")
+            clear_output(wait=True) if optuna == False else None
+            
+        mean_train_scores = f"{np.mean(train_scores):.4f}"
+        mean_off_scores = f"{np.mean(oof_scores):.4f}"
+        
+        print(f"Overall Train {self.metric.upper()}: {mean_train_scores}") if optuna == False else None
+        print(f"Overall OOF {self.metric.upper()}:{mean_off_scores} ") if optuna == False else None
 
         mean_test_preds = test_preds.mean(axis=1) if self.X_test is not None else None
-        return oof_predictions, mean_test_preds , model , all_models
+        return oof_predictions, mean_test_preds , model , all_models , mean_off_scores , mean_train_scores
+    
+    def _setup_default_logger(self) -> logging.Logger:
+        logger = logging.getLogger(self.__class__.__name__)
+        logger.setLevel(logging.INFO)
+        
+        if logger.handlers:
+            logger.handlers.clear()
+            
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        return logger
+
+    def OPTUNE_TRAIN(self, trial: optuna.trial.Trial, MODEL_NAME: str = "",optuna=True,
+        PARAMS: Optional[Dict[str, Union[Tuple[Union[int, float], Union[int, float]], Any]]] = None) -> Tuple[float, float]:
+        
+        params = PARAMS.copy() if PARAMS else {}
+        
+        for param, value in params.items():
+            try:
+                if isinstance(value, tuple) and len(value) == 2:
+                    if isinstance(value[0], int):
+                        params[param] = trial.suggest_int(param, value[0], value[1])
+                    elif isinstance(value[0], float):
+                        params[param] = trial.suggest_float(param, value[0], value[1], log=True)
+            except Exception as e:
+                self.logger.error(f"Error suggesting parameter {param}: {e}")
+                raise
+        
+        try:
+            result = self.Train_ML(params=params, model_name=MODEL_NAME, e_stop=40, estimator=None, g_col=None, tab_net_train_params=None,optuna=optuna)
+            
+            test_score = result[4]
+            train_score = result[5]
+            try:
+                test_score = float(test_score)
+                train_score = float(train_score)
+                return train_score, test_score
+            except ValueError as e:
+                raise ValueError(f"Score '{test_score}' and {train_score} is not a valid float. Original error: {e}")
+        
+        except Exception as e:
+            self.logger.error(f"Training failed for {MODEL_NAME}: {e}")
+            raise        
+            
+    def RUN_OPTUNA(
+            self, MODEL_NAME: str, PARAMS: Dict[str, Any], DIRECTION: str = 'minimize', 
+            TRIALS: int = 10, SEED: int = 42, ENABLE_PRUNER: bool = False, 
+            PRUNER_PARAMS: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        
+        sampler = optuna.samplers.TPESampler(seed=SEED)
+        
+        pruner = None
+        if ENABLE_PRUNER:
+            pruner_config = PRUNER_PARAMS or {
+                'n_startup_trials': 5,
+                'n_warmup_steps': 3,
+                'n_valid_steps': 3
+            }
+            pruner = optuna.pruners.MedianPruner(**pruner_config)
+        
+        study = optuna.create_study(sampler=sampler, direction=DIRECTION, pruner=pruner)
+        
+        best_scores = {'train_score': None, 'val_score': None}
+        
+        def objective(trial):
+            train_score, val_score = self.OPTUNE_TRAIN(trial, MODEL_NAME=MODEL_NAME, PARAMS=PARAMS)
+                
+            if best_scores['val_score'] is None or (
+                (DIRECTION == 'minimize' and val_score < best_scores['val_score']) or
+                (DIRECTION == 'maximize' and val_score > best_scores['val_score'])
+            ):
+                best_scores['train_score'] = train_score
+                best_scores['val_score'] = val_score
+            
+            return val_score
+        
+        try:
+            study.optimize(objective, n_trials=TRIALS)
+            
+            self.logger.info(Fore.RED + f"--> Best Train Score for {MODEL_NAME}: " + 
+                            Fore.CYAN + f"{best_scores['train_score']:.4f}")
+            self.logger.info(Fore.RED + f"--> Best Validation Score for {MODEL_NAME}: " + 
+                            Fore.CYAN + f"{best_scores['val_score']:.4f}")
+            self.logger.info(Fore.RED + f"--> Best Parameters: " + Fore.CYAN + f"{study.best_params}")
+            
+            return study
+        
+        except Exception as e:
+            self.logger.error(f"Optuna Optimization Failed: {str(e)}")
+            raise
