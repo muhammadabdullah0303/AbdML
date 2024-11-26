@@ -123,7 +123,7 @@ class AbdBase:
 
         self.X_train = self.train_data.drop(self.target_column, axis=1).to_numpy() if self.numpy_data else self.train_data.drop(self.target_column, axis=1)
         self.y_train = self.train_data[self.target_column].to_numpy() if self.numpy_data else self.train_data[self.target_column]
-        self.y_train = self.y_train.reshape(-1, 1) if self.problem_type == 'regression' else self.y_train
+        self.y_train = self.y_train.reshape(-1, 1) if self.model_name == 'TABNET' else self.y_train
         
         if self.test_data is not None:
             self.X_test = self.test_data.to_numpy() if self.numpy_data else self.test_data
