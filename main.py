@@ -258,7 +258,7 @@ class AbdBase:
         else:
             raise ValueError(f"Unsupported metric '{self.metric}'")
 
-    def Train_ML(self, params, model_name, e_stop=50,estimator=None,g_col=None,tab_net_train_params=None,optuna=False):
+    def Train_ML(self, params, model_name, e_stop=50,estimator=None,g_col=None,tab_net_train_params=None,optuna=False, V_weights=None):
         print(f"The EarlyStopping is {e_stop}") if optuna == False else None
         if self.metric not in self.metrics:
             raise ValueError(f"Metric '{self.metric}' is not supported. Choose from Given Metrics.")
@@ -320,7 +320,7 @@ class AbdBase:
                 model = CatBoostClassifier(**params, random_state=self.seed, verbose=0,task_type='GPU' if self.gpu else 'cpu') if self.problem_type == 'classification' else CatBoostRegressor(**params, random_state=self.seed, verbose=0,
                 task_type='GPU' if self.gpu else 'cpu')
             elif model_name == 'Voting':
-                model = VotingClassifier(estimators=estimator) if self.problem_type == 'classification' else VotingRegressor(estimators=estimator)
+                model = VotingClassifier(estimators=estimator,weights=V_weights if V_weights is not None else None) if self.problem_type == 'classification' else VotingRegressor(estimators=estimator,weights=V_weights if V_weights is not None else None)
             else:
                 raise ValueError("model_name must be 'LGBM' or 'CAT'.")
 
