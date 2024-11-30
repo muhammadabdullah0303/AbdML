@@ -3,6 +3,7 @@
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
+from copy import deepcopy
 from catboost import CatBoostClassifier, Pool, CatBoostRegressor
 from pytorch_tabnet.tab_model import TabNetRegressor,TabNetClassifier
 import lightgbm as lgb
@@ -335,6 +336,7 @@ class AbdBase:
                 model.fit(train_pool, eval_set=val_pool, early_stopping_rounds=e_stop if self.early_stop else None)
             elif model_name == 'Voting':
                 model.fit(X_train, y_train)
+            all_models.append(model)
 
             if self.problem_type == 'classification':
                 y_train_pred = model.predict_proba(X_train)[:, 1] if self.prob else model.predict(X_train)
@@ -370,7 +372,6 @@ class AbdBase:
                     test_preds[:, fold] = model.predict(self.X_test)
 
             print(f"Fold {fold + 1} - Train {self.metric.upper()}: {train_scores[-1]:.4f}, OOF {self.metric.upper()}: {oof_scores[-1]:.4f}") if optuna == False else None
-            all_models.append(model)
             clear_output(wait=True) if optuna == False else None
             
         mean_train_scores = f"{np.mean(train_scores):.4f}"
