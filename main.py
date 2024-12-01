@@ -40,7 +40,7 @@ class AbdBase:
     current_version = ['V_1.3']
     
     def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,numpy_data=False,
-                 problem_type="classification", metric="roc_auc", seed=SEED,log_y=False,
+                 problem_type="classification", metric="roc_auc", seed=SEED,
                  n_splits=5, cat_features=None, num_classes=None, prob=False,stat_fe = None,logger: Optional[logging.Logger] = None,
                  early_stop=False, test_prob=False, fold_type='SKF',weights=None,multi_column_tfidf=None):
 
@@ -64,7 +64,6 @@ class AbdBase:
         self.gpu = gpu
         self.numpy_data = numpy_data
         self.logger = logger or self._setup_default_logger()
-        self.log_y = log_y
         
         self._validate_input()
         self.checkTarget()
@@ -126,7 +125,6 @@ class AbdBase:
         self.X_train = self.train_data.drop(self.target_column, axis=1).to_numpy() if self.numpy_data else self.train_data.drop(self.target_column, axis=1)
         self.y_train = self.train_data[self.target_column].to_numpy() if self.numpy_data else self.train_data[self.target_column]
         self.y_train = self.y_train.reshape(-1, 1) if self.model_name == 'TABNET' else self.y_train
-        self.y_train = np.log1p(self.train_data[self.target_column]) if self.log_y else self.train_data[self.target_column]
         
         if self.test_data is not None:
             self.X_test = self.test_data.to_numpy() if self.numpy_data else self.test_data
@@ -267,7 +265,7 @@ class AbdBase:
         else:
             raise ValueError(f"Unsupported metric '{self.metric}'")
 
-    def Train_ML(self, params, model_name, e_stop=50,estimator=None,g_col=None,tab_net_train_params=None,optuna=False, V_weights=None):
+    def Train_ML(self, params, model_name, e_stop=50,estimator=None,g_col=None,tab_net_train_params=None,optuna=False, V_weights=None,y_log=False):
         print(f"The EarlyStopping is {e_stop}") if optuna == False else None
         if self.metric not in self.metrics:
             raise ValueError(f"Metric '{self.metric}' is not supported. Choose from Given Metrics.")
@@ -305,6 +303,10 @@ class AbdBase:
             else:
                 X_train, X_val = self.X_train.iloc[train_idx], self.X_train.iloc[val_idx]
                 y_train, y_val = self.y_train.iloc[train_idx], self.y_train.iloc[val_idx]
+
+            if y_log:
+                y_train = np.log1p(y_train)
+                y_val = np.log1p(y_val)
             
             # Sample The Test Weights
             def distribute_test_weights(test_sample_size, weights):
@@ -354,12 +356,9 @@ class AbdBase:
                 y_train_pred = model.predict(X_train)
                 y_val_pred = model.predict(X_val)
                 
-            if self.log_y:
+            if y_log:
                 y_train_pred = np.expm1(y_train_pred)
                 y_val_pred = np.expm1(y_val_pred)
-            else :
-                y_train_pred = y_train_pred
-                y_val_pred = y_val_pred
                 
             oof_predictions[val_idx] = y_val_pred
 
@@ -398,10 +397,10 @@ class AbdBase:
         print(f"Overall OOF {self.metric.upper()}:{mean_off_scores} ") if optuna == False else None
 
         mean_test_preds = test_preds.mean(axis=1) if self.X_test is not None else None
-        if self.log_y:
+
+        if y_log:
             mean_test_preds = np.expm1(mean_test_preds)
-        else :
-            mean_test_preds = mean_test_preds
+
         return oof_predictions, mean_test_preds , model , all_models , mean_off_scores , mean_train_scores
     
     def _setup_default_logger(self) -> logging.Logger:
