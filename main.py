@@ -417,43 +417,11 @@ class AbdBase:
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         return logger
-
-    def OPTUNE_TRAIN(self, trial: optuna.trial.Trial, MODEL_NAME: str = "",optuna=True,
-        PARAMS: Optional[Dict[str, Union[Tuple[Union[int, float], Union[int, float]], Any]]] = None) -> Tuple[float, float]:
-        
-        params = PARAMS.copy() if PARAMS else {}
-        
-        for param, value in params.items():
-            try:
-                if isinstance(value, tuple) and len(value) == 2:
-                    if isinstance(value[0], int):
-                        params[param] = trial.suggest_int(param, value[0], value[1])
-                    elif isinstance(value[0], float):
-                        params[param] = trial.suggest_float(param, value[0], value[1], log=True)
-            except Exception as e:
-                self.logger.error(f"Error suggesting parameter {param}: {e}")
-                raise
-        
-        try:
-            result = self.Train_ML(params=params, model_name=MODEL_NAME, e_stop=40, estimator=None, g_col=None, tab_net_train_params=None,optuna=optuna)
-            
-            test_score = result[4]
-            train_score = result[5]
-            try:
-                test_score = float(test_score)
-                train_score = float(train_score)
-                return train_score, test_score
-            except ValueError as e:
-                raise ValueError(f"Score '{test_score}' and {train_score} is not a valid float. Original error: {e}")
-        
-        except Exception as e:
-            self.logger.error(f"Training failed for {MODEL_NAME}: {e}")
-            raise        
-            
+    
     def RUN_OPTUNA(
             self, MODEL_NAME: str, PARAMS: Dict[str, Any], DIRECTION: str = 'minimize', 
             TRIALS: int = 10, SEED: int = 42, ENABLE_PRUNER: bool = False, 
-            PRUNER_PARAMS: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+            PRUNER_PARAMS: Optional[Dict[str, Any]] = None, y_log: bool = False) -> Dict[str, Any]:
         
         sampler = optuna.samplers.TPESampler(seed=SEED)
         
@@ -471,8 +439,8 @@ class AbdBase:
         best_scores = {'train_score': None, 'val_score': None}
         
         def objective(trial):
-            train_score, val_score = self.OPTUNE_TRAIN(trial, MODEL_NAME=MODEL_NAME, PARAMS=PARAMS)
-                
+            train_score, val_score = self.OPTUNE_TRAIN(trial, MODEL_NAME=MODEL_NAME, PARAMS=PARAMS, y_log=y_log)
+            
             if best_scores['val_score'] is None or (
                 (DIRECTION == 'minimize' and val_score < best_scores['val_score']) or
                 (DIRECTION == 'maximize' and val_score > best_scores['val_score'])
@@ -496,3 +464,37 @@ class AbdBase:
         except Exception as e:
             self.logger.error(f"Optuna Optimization Failed: {str(e)}")
             raise
+    
+    def OPTUNE_TRAIN(self, trial: optuna.trial.Trial, MODEL_NAME: str = "", optuna=True,
+            PARAMS: Optional[Dict[str, Union[Tuple[Union[int, float], Union[int, float]], Any]]] = None,
+            y_log: bool = False) -> Tuple[float, float]:
+        
+        params = PARAMS.copy() if PARAMS else {}
+        
+        for param, value in params.items():
+            try:
+                if isinstance(value, tuple) and len(value) == 2:
+                    if isinstance(value[0], int):
+                        params[param] = trial.suggest_int(param, value[0], value[1])
+                    elif isinstance(value[0], float):
+                        params[param] = trial.suggest_float(param, value[0], value[1], log=True)
+            except Exception as e:
+                self.logger.error(f"Error suggesting parameter {param}: {e}")
+                raise
+        
+        try:
+            result = self.Train_ML(params=params, model_name=MODEL_NAME, e_stop=40, estimator=None, 
+                                   g_col=None, tab_net_train_params=None, optuna=optuna, y_log=y_log)
+            
+            test_score = result[4]
+            train_score = result[5]
+            try:
+                test_score = float(test_score)
+                train_score = float(train_score)
+                return train_score, test_score
+            except ValueError as e:
+                raise ValueError(f"Score '{test_score}' and {train_score} is not a valid float. Original error: {e}")
+        
+        except Exception as e:
+            self.logger.error(f"Training failed for {MODEL_NAME}: {e}")
+            raise        
