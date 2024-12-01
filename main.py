@@ -359,6 +359,8 @@ class AbdBase:
             if y_log:
                 y_train_pred = np.expm1(y_train_pred)
                 y_val_pred = np.expm1(y_val_pred)
+                y_train = np.expm1(y_train)
+                y_val = np.expm1(y_val)
                 
             oof_predictions[val_idx] = y_val_pred
 
@@ -394,7 +396,7 @@ class AbdBase:
         mean_off_scores = f"{np.mean(oof_scores):.4f}"
         
         print(f"Overall Train {self.metric.upper()}: {mean_train_scores}") if optuna == False else None
-        print(f"Overall OOF {self.metric.upper()}:{mean_off_scores} ") if optuna == False else None
+        print(f"Overall OOF {self.metric.upper()}: {mean_off_scores} ") if optuna == False else None
 
         mean_test_preds = test_preds.mean(axis=1) if self.X_test is not None else None
 
