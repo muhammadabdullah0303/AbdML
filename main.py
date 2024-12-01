@@ -3,12 +3,12 @@
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
-from copy import deepcopy
 from catboost import CatBoostClassifier, Pool, CatBoostRegressor
 from pytorch_tabnet.tab_model import TabNetRegressor,TabNetClassifier
 import lightgbm as lgb
 from lightgbm import LGBMRegressor, early_stopping
 from sklearn.model_selection import StratifiedKFold, KFold, GroupKFold
+from sklearn.model_selection import *
 from sklearn.metrics import *
 from IPython.display import clear_output
 from xgboost import XGBRegressor,XGBClassifier
@@ -33,10 +33,10 @@ SEED = 42
 class AbdBase:
     
     model_name = ["LGBM", "CAT", "XGB","Voting",'TABNET']
-    metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse','wmae']
+    metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse','wmae',"rmsle"]
     regression_metrics = ["mae", "r2"]
     problem_types = ["classification", "regression"]
-    cv_types = ['SKF', 'KF', 'GKF', 'GSKF']
+    cv_types = ['SKF', 'KF', 'GKF', 'GSKF',"RSKF"]
     current_version = ['V_1.3']
     
     def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,numpy_data=False,
@@ -237,6 +237,10 @@ class AbdBase:
     def weighted_mean_absolute_error(self, y_true, y_pred, weights):
         return np.sum(weights * np.abs(y_true - y_pred)) / np.sum(weights)
 
+    def rmsLe(self, y_true, y_pred):
+        y_pred = np.maximum(y_pred, 1e-6)
+        return np.sqrt(mean_squared_log_error(y_true, y_pred))
+
     def get_metric(self, y_true, y_pred, weights=None):
         if self.metric == 'roc_auc':
             return roc_auc_score(y_true, y_pred, multi_class="ovr" if self.num_classes > 2 else None)
@@ -256,6 +260,8 @@ class AbdBase:
             return mean_squared_error(y_true, y_pred, squared=False)
         elif self.metric == 'wmae' and weights is not None:
             return self.weighted_mean_absolute_error(y_true, y_pred, weights)
+        elif self.metric == 'rmsle':
+            return self.rmsLe(y_true, y_pred)
         else:
             raise ValueError(f"Unsupported metric '{self.metric}'")
 
@@ -272,8 +278,10 @@ class AbdBase:
             kfold = KFold(n_splits=self.n_splits, shuffle=True, random_state=self.seed)
         elif self.fold_type == 'GKF':
             kfold = GroupKFold(n_splits=self.n_splits)
-        elif self.fold_type == 'GSKF':
-            raise NotImplementedError("Group Stratified KFold not implemented yet.")
+        elif self.fold_type == 'RSKF':
+            kfold = RepeatedKFold(n_splits=self.n_splits, n_repeats=1, random_state=self.seed)
+        else:
+            raise NotImplementedError("Select the Given Cv Statergy")
 
         train_scores = []
         oof_scores = []
@@ -336,7 +344,6 @@ class AbdBase:
                 model.fit(train_pool, eval_set=val_pool, early_stopping_rounds=e_stop if self.early_stop else None)
             elif model_name == 'Voting':
                 model.fit(X_train, y_train)
-            all_models.append(model)
 
             if self.problem_type == 'classification':
                 y_train_pred = model.predict_proba(X_train)[:, 1] if self.prob else model.predict(X_train)
@@ -372,6 +379,7 @@ class AbdBase:
                     test_preds[:, fold] = model.predict(self.X_test)
 
             print(f"Fold {fold + 1} - Train {self.metric.upper()}: {train_scores[-1]:.4f}, OOF {self.metric.upper()}: {oof_scores[-1]:.4f}") if optuna == False else None
+            all_models.append(model)
             clear_output(wait=True) if optuna == False else None
             
         mean_train_scores = f"{np.mean(train_scores):.4f}"
