@@ -36,7 +36,7 @@ class AbdBase:
     metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse','wmae',"rmsle"]
     regression_metrics = ["mae", "r2"]
     problem_types = ["classification", "regression"]
-    cv_types = ['SKF', 'KF', 'GKF', 'GSKF',"RSKF"]
+    cv_types = ['SKF', 'KF', 'GKF', 'GSKF',"RKF"]
     current_version = ['V_1.3']
     
     def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,numpy_data=False,
@@ -278,7 +278,7 @@ class AbdBase:
             kfold = KFold(n_splits=self.n_splits, shuffle=True, random_state=self.seed)
         elif self.fold_type == 'GKF':
             kfold = GroupKFold(n_splits=self.n_splits)
-        elif self.fold_type == 'RSKF':
+        elif self.fold_type == 'RKF':
             kfold = RepeatedKFold(n_splits=self.n_splits, n_repeats=1, random_state=self.seed)
         else:
             raise NotImplementedError("Select the Given Cv Statergy")
