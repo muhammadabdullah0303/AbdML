@@ -26,6 +26,11 @@ import optuna
 from typing import Dict, Any, Optional, Union, Tuple
 from colorama import Fore
 import logging
+import pandas.api.types
+from lifelines.utils import concordance_index
+
+class ParticipantVisibleError(Exception):
+    pass
 
 
 SEED = 42
