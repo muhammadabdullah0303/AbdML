@@ -118,7 +118,7 @@ class AbdBase:
         if self.ohe_fe:
             
             print(Fore.YELLOW + f"\n---> Adding OHE Features\n")
-            self.cat_c = ohe_fe.get('cat_c', cat_c)
+            self.cat_c = ohe_fe.get('cat_c', [])
             if self.train_data is not None and self.test_data is not None:
                 self.train_data, self.test_data = self.ohe_transform(
                     train=self.train_data,
