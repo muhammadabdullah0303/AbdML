@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from catboost import CatBoostClassifier, Pool, CatBoostRegressor
-from pytorch_tabnet.tab_model import TabNetRegressor,TabNetClassifier
+# from pytorch_tabnet.tab_model import TabNetRegressor,TabNetClassifier
 import lightgbm as lgb
 from lightgbm import LGBMRegressor, early_stopping
 from sklearn.model_selection import StratifiedKFold, KFold, GroupKFold
