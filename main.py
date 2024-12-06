@@ -47,7 +47,7 @@ class AbdBase:
     current_version = ['V_1.3']
     
     def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,numpy_data=False,
-                 problem_type="classification", metric="roc_auc", seed=SEED,ohe_fe=False,label_encode=False,
+                 problem_type="classification", metric="roc_auc", seed=SEED,ohe_fe=False,label_encode=False,target_encode=False,
                  n_splits=5, cat_features=None, num_classes=None, prob=False,stat_fe = None,logger: Optional[logging.Logger] = None,
                  early_stop=False, test_prob=False, fold_type='SKF',weights=None,multi_column_tfidf=None):
 
@@ -72,6 +72,7 @@ class AbdBase:
         self.numpy_data = numpy_data
         self.ohe_fe = ohe_fe
         self.label_encode = label_encode
+        self.target_encode = target_encode
         self.logger = logger or self._setup_default_logger()
         
         self._validate_input()
@@ -135,6 +136,16 @@ class AbdBase:
                     test=self.test_data,
                     cat_cols=self.cat_c, 
                 )
+
+        if self.target_encode:
+            print(Fore.YELLOW + f"\n---> Applying Target Encoder\n")
+            self.cat_c = target_encode.get('cat_c', [])
+            if self.train_data is not None and self.test_data is not None:
+                self.train_data, self.test_data = self.factorize_and_encode(
+                    train=self.train_data,
+                    test=self.test_data,
+                    cat_cols=self.cat_c, 
+                )
                     
         if self.multi_column_tfidf:
 
@@ -172,7 +183,32 @@ class AbdBase:
             label_encoders[col] = le
         
         return train, test
-
+        
+    @staticmethod
+    def factorize_and_encode(train: pd.DataFrame, test: pd.DataFrame, cat_cols: list) -> pd.DataFrame:
+    
+        combined = pd.concat([train, test], axis=0, ignore_index=True)
+        
+        for c in cat_cols:
+            if c in combined.columns:
+                combined[c], _ = combined[c].factorize()
+                combined[c] -= combined[c].min()
+                combined[c] = combined[c].astype("int32")  
+                combined[c] = combined[c].astype("category") 
+        
+        for c in combined.columns:
+            if c not in cat_cols:
+                if combined[c].dtype == "float64":
+                    combined[c] = combined[c].astype("float32")
+                elif combined[c].dtype == "int64":
+                    combined[c] = combined[c].astype("int32")
+        
+        train_encoded = combined.iloc[:len(train)].copy()
+        test_encoded = combined.iloc[len(train):].reset_index(drop=True).copy()
+    
+        test_encoded = test_encoded.drop(columns=['target'])
+        
+        return train_encoded, test_encoded
             
     @staticmethod
     def ohe_transform(train: pd.DataFrame, test: pd.DataFrame, cat_cols: list):
