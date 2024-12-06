@@ -128,7 +128,7 @@ class AbdBase:
 
         if self.label_encode:
             print(Fore.YELLOW + f"\n---> Applying Label Encoder\n")
-            self.cat_c = label_encode.get('cat_c', cat_c)
+            self.cat_c = label_encode.get('cat_c', [])
             if self.train_data is not None and self.test_data is not None:
                 self.train_data, self.test_data = self.label_encode_transform(
                     train=self.train_data,
