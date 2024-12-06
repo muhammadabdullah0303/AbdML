@@ -41,14 +41,13 @@ SEED = 42
 class AbdBase:
     
     model_name = ["LGBM", "CAT", "XGB","Voting",'TABNET']
-    metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse','wmae',"rmsle"]
-    regression_metrics = ["mae", "r2"]
+    metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse','wmae',"rmsle","mae", "r2"]
     problem_types = ["classification", "regression"]
     cv_types = ['SKF', 'KF', 'GKF', 'GSKF',"RKF"]
     current_version = ['V_1.3']
     
     def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,numpy_data=False,
-                 problem_type="classification", metric="roc_auc", seed=SEED,ohe_fe=False,label_encode=False
+                 problem_type="classification", metric="roc_auc", seed=SEED,ohe_fe=False,label_encode=False,
                  n_splits=5, cat_features=None, num_classes=None, prob=False,stat_fe = None,logger: Optional[logging.Logger] = None,
                  early_stop=False, test_prob=False, fold_type='SKF',weights=None,multi_column_tfidf=None):
 
@@ -129,9 +128,9 @@ class AbdBase:
 
         if self.label_encode:
             print(Fore.YELLOW + f"\n---> Applying Label Encoder\n")
-            self.cat_c = ohe_fe.get('cat_c', cat_c)
+            self.cat_c = label_encode.get('cat_c', cat_c)
             if self.train_data is not None and self.test_data is not None:
-                self.train_data, self.test_data = self.ohe_transform(
+                self.train_data, self.test_data = self.label_encode_transform(
                     train=self.train_data,
                     test=self.test_data,
                     cat_cols=self.cat_c, 
@@ -164,16 +163,16 @@ class AbdBase:
 
     @staticmethod
     def label_encode_transform(train: pd.DataFrame, test: pd.DataFrame, cat_cols: list):
-        
         label_encoders = {}
-    
+        
         for col in cat_cols:
             le = LabelEncoder()
             train[col] = le.fit_transform(train[col])
             test[col] = test[col].apply(lambda x: le.transform([x])[0] if x in le.classes_ else -1)
             label_encoders[col] = le
-    
+        
         return train, test
+
             
     @staticmethod
     def ohe_transform(train: pd.DataFrame, test: pd.DataFrame, cat_cols: list):
@@ -419,8 +418,8 @@ class AbdBase:
             elif model_name == 'CAT':
                 train_pool = Pool(data=X_train, label=y_train, cat_features=cat_features_indices)
                 val_pool = Pool(data=X_val, label=y_val, cat_features=cat_features_indices)
-                model = CatBoostClassifier(**params, random_state=self.seed, verbose=0,task_type='GPU' if self.gpu else 'cpu') if self.problem_type == 'classification' else CatBoostRegressor(**params, random_state=self.seed, verbose=0,
-                task_type='GPU' if self.gpu else 'cpu')
+                model = CatBoostClassifier(**params, random_state=self.seed, verbose=0,task_type='GPU' if self.gpu else 'CPU') if self.problem_type == 'classification' else CatBoostRegressor(**params, random_state=self.seed, verbose=0,
+                task_type='GPU' if self.gpu else 'CPU')
             elif model_name == 'Voting':
                 model = VotingClassifier(estimators=estimator,weights=V_weights if V_weights is not None else None) if self.problem_type == 'classification' else VotingRegressor(estimators=estimator,weights=V_weights if V_weights is not None else None)
             else:
