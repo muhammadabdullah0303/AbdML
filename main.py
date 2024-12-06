@@ -28,6 +28,8 @@ from colorama import Fore
 import logging
 import pandas.api.types
 from lifelines.utils import concordance_index
+import pandas as pd
+from sklearn.preprocessing import OneHotEncoder
 
 class ParticipantVisibleError(Exception):
     pass
@@ -45,7 +47,7 @@ class AbdBase:
     current_version = ['V_1.3']
     
     def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,numpy_data=False,
-                 problem_type="classification", metric="roc_auc", seed=SEED,
+                 problem_type="classification", metric="roc_auc", seed=SEED,ohe_fe=False,
                  n_splits=5, cat_features=None, num_classes=None, prob=False,stat_fe = None,logger: Optional[logging.Logger] = None,
                  early_stop=False, test_prob=False, fold_type='SKF',weights=None,multi_column_tfidf=None):
 
@@ -68,6 +70,7 @@ class AbdBase:
         self.multi_column_tfidf = multi_column_tfidf
         self.gpu = gpu
         self.numpy_data = numpy_data
+        self.ohe_fe = ohe_fe
         self.logger = logger or self._setup_default_logger()
         
         self._validate_input()
@@ -110,6 +113,18 @@ class AbdBase:
                         df=self.test_data,
                         txt_cols=self.txt_columns,
                     )
+        
+        if self.ohe_fe:
+            
+            print(Fore.YELLOW + f"\n---> Adding OHE Features\n")
+            self.cat_c = ohe_fe.get('cat_c', cat_c)
+            if self.train_data is not None and self.test_data is not None:
+                self.train_data, self.test_data = self.ohe_transform(
+                    train=self.train_data,
+                    test=self.test_data,
+                    cat_cols=self.cat_c, 
+                )
+            
                     
         if self.multi_column_tfidf:
 
@@ -135,7 +150,27 @@ class AbdBase:
             self.X_test = self.test_data.to_numpy() if self.numpy_data else self.test_data
         else:
             self.X_test = None
-
+            
+    @staticmethod
+    def ohe_transform(train: pd.DataFrame, test: pd.DataFrame, cat_cols: list):
+    
+        ohe = OneHotEncoder(sparse=False, handle_unknown='ignore')
+    
+        train_ohe = pd.DataFrame(ohe.fit_transform(train[cat_cols]), 
+                                 columns=ohe.get_feature_names_out(cat_cols), 
+                                 index=train.index)
+        
+        test_ohe = pd.DataFrame(ohe.transform(test[cat_cols]), 
+                                columns=ohe.get_feature_names_out(cat_cols), 
+                                index=test.index)
+    
+        train = train.drop(columns=cat_cols).reset_index(drop=True)
+        test = test.drop(columns=cat_cols).reset_index(drop=True)
+    
+        train = pd.concat([train, train_ohe.reset_index(drop=True)], axis=1)
+        test = pd.concat([test, test_ohe.reset_index(drop=True)], axis=1)
+    
+        return train, test
 
     def CIBMTR_score(self,solution: pd.DataFrame, submission: pd.DataFrame, row_id_column_name: str) -> float:
         
