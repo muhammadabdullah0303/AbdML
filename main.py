@@ -41,7 +41,7 @@ SEED = 42
 class AbdBase:
     
     model_name = ["LGBM", "CAT", "XGB","Voting",'TABNET']
-    metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse','wmae',"rmsle","mae", "r2"]
+    metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse','wmae',"rmsle","mae", "r2",'mse']
     problem_types = ["classification", "regression"]
     cv_types = ['SKF', 'KF', 'GKF', 'GSKF',"RKF"]
     current_version = ['V_1.3']
@@ -386,6 +386,8 @@ class AbdBase:
             return self.weighted_mean_absolute_error(y_true, y_pred, weights)
         elif self.metric == 'rmsle':
             return self.rmsLe(y_true, y_pred)
+        elif self.metric == 'mse':
+            return mean_squared_error(y_true, y_pred, squared=True)
         else:
             raise ValueError(f"Unsupported metric '{self.metric}'")
 
