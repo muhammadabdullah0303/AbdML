@@ -140,11 +140,13 @@ class AbdBase:
         if self.target_encode:
             print(Fore.YELLOW + f"\n---> Applying Target Encoder\n")
             self.cat_c = target_encode.get('cat_c', [])
+            self.target_col = target_encode.get('target_col',[])
             if self.train_data is not None and self.test_data is not None:
                 self.train_data, self.test_data = self.factorize_and_encode(
                     train=self.train_data,
                     test=self.test_data,
                     cat_cols=self.cat_c, 
+                    target_col=self.target_col, 
                 )
                     
         if self.multi_column_tfidf:
@@ -185,7 +187,7 @@ class AbdBase:
         return train, test
         
     @staticmethod
-    def factorize_and_encode(train: pd.DataFrame, test: pd.DataFrame, cat_cols: list) -> pd.DataFrame:
+    def factorize_and_encode(train: pd.DataFrame, test: pd.DataFrame, cat_cols: list, target_col) -> pd.DataFrame:
     
         combined = pd.concat([train, test], axis=0, ignore_index=True)
         
@@ -206,7 +208,7 @@ class AbdBase:
         train_encoded = combined.iloc[:len(train)].copy()
         test_encoded = combined.iloc[len(train):].reset_index(drop=True).copy()
     
-        test_encoded = test_encoded.drop(columns=['target'])
+        test_encoded = test_encoded.drop(columns=[target_col])
         
         return train_encoded, test_encoded
             
