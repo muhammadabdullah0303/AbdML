@@ -466,26 +466,17 @@ class AbdBase:
                 raise ValueError("model_name must be 'LGBM' or 'CAT'.")
 
             callbacks = [early_stopping(stopping_rounds=e_stop, verbose=False)] if self.early_stop else None
-            callbacks = [early_stopping(stopping_rounds=e_stop, verbose=False)] if self.early_stop else None
             if model_name == 'LGBM':
-                if self.metric.lower() not in ['mae', 'mse', 'rmse', 'rmsle', 'wmae']:
-                    raise ValueError(f"LGBM does not support {self.metric} directly for regression.")
                 model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.metric.lower() if self.metric.lower() in ['mae', 'mse', 'rmse', 'rmsle', 'wmae'] else self.metric, callbacks=callbacks)
             
             elif model_name == 'TABNET':
-                if self.metric.lower() not in ['accuracy', 'f1', 'mae', 'mse', 'rmse', 'roc_auc']:
-                    raise ValueError(f"TABNET does not support {self.metric} directly.")
                 model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.metric, **tab_net_train_params)
             
             elif model_name == 'XGB':
-                if self.metric.lower() not in ['mae', 'mse', 'rmse', 'rmsle', 'wmae']:
-                    raise ValueError(f"XGBoost does not support {self.metric} directly for regression.")
                 model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.metric.lower() if self.metric.lower() in ['mae', 'mse', 'rmse', 'rmsle', 'wmae'] else self.metric, early_stopping_rounds=e_stop if self.early_stop else None, verbose=False)
             
             elif model_name == 'CAT':
-                if self.metric.lower() not in ['mae', 'mse', 'rmse']:
-                    raise ValueError(f"CATBoost does not support {self.metric} directly for regression.")
-                model.fit(train_pool, eval_set=val_pool, eval_metric=self.metric.upper() if self.metric.lower() == 'mae' else self.metric, early_stopping_rounds=e_stop if self.early_stop else None)
+                model.fit(train_pool, eval_set=val_pool, early_stopping_rounds=e_stop if self.early_stop else None)
             
             elif model_name == 'Voting':
                 model.fit(X_train, y_train)
