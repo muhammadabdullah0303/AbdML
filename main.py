@@ -169,18 +169,15 @@ class AbdBase:
 
         if self.handle_date: 
             print(Fore.YELLOW + f"\nAdding Date Features")
-            self.cat_c = handle_date.get('cat_c', [])
-
+            
             if self.train_data is not None:
                     self.train_data = self.date(
                         df=self.train_data,
-                        cat_c=self.cat_c,
                     )
 
             if self.test_data is not None:
                     self.test_data = self.date(
                         df=self.test_data,
-                        cat_c=self.cat_c,
                     )
 
         self.X_train = self.train_data.drop(self.target_column, axis=1).to_numpy() if self.numpy_data else self.train_data.drop(self.target_column, axis=1)
@@ -231,7 +228,7 @@ class AbdBase:
         return train_encoded, test_encoded
         
     @staticmethod
-    def date(df, cat_c): 
+    def date(df): 
         df['date'] = pd.to_datetime(df['date'])
         df['year'] = df['date'].dt.year
         df['day'] = df['date'].dt.day
@@ -251,9 +248,6 @@ class AbdBase:
         df['sin_year'] = np.sin(df['year'] * (2 * np.pi) / 100)
         df['year_lag_1'] = df['year'].shift(1)
         df['year_diff'] = df['year'] - df['year_lag_1']
-        
-        for c in cat_c:
-            df[c] = df[c].astype('category')
     
         return df
             
