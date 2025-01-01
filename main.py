@@ -407,7 +407,7 @@ class AbdBase:
         return np.sqrt(mean_squared_log_error(y_true, y_pred))
 
     def mape(self, y_true, y_pred):
-        return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+        return mean_absolute_percentage_error(y_true, y_pred)
 
     def get_metric(self, y_true, y_pred, weights=None):
         if self.metric == 'roc_auc':
