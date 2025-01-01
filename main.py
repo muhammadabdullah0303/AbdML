@@ -71,15 +71,29 @@ class AbdBase:
         self.multi_column_tfidf = multi_column_tfidf
         self.gpu = gpu
         self.numpy_data = numpy_data
+        self.handle_date = handle_date
         self.ohe_fe = ohe_fe
         self.label_encode = label_encode
         self.target_encode = target_encode
-        self.handle_date = handle_date
         self.logger = logger or self._setup_default_logger()
         
         self._validate_input()
         self.checkTarget()
         self._display_initial_info()
+
+        if self.handle_date: 
+            print(Fore.YELLOW + f"\nAdding Date Features")
+            
+            if self.train_data is not None:
+                    self.train_data = self.date(
+                        df=self.train_data,
+                    )
+
+            if self.test_data is not None:
+                    self.test_data = self.date(
+                        df=self.test_data,
+                    )
+
         
         if self.tf_vec: 
             self.text_column = tf_vec.get('text_column', '')
@@ -165,20 +179,6 @@ class AbdBase:
                     text_columns=self.text_columns, 
                     max_features=self.max_features,
                 )
-
-
-        if self.handle_date: 
-            print(Fore.YELLOW + f"\nAdding Date Features")
-            
-            if self.train_data is not None:
-                    self.train_data = self.date(
-                        df=self.train_data,
-                    )
-
-            if self.test_data is not None:
-                    self.test_data = self.date(
-                        df=self.test_data,
-                    )
 
         self.X_train = self.train_data.drop(self.target_column, axis=1).to_numpy() if self.numpy_data else self.train_data.drop(self.target_column, axis=1)
         self.y_train = self.train_data[self.target_column].to_numpy() if self.numpy_data else self.train_data[self.target_column]
