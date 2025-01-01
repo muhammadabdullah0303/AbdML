@@ -439,7 +439,7 @@ class AbdBase:
         elif self.metric == 'mse':
             return mean_squared_error(y_true, y_pred, squared=True)
         elif self.metric == "mape":
-            return mape(y_true, y_pred)
+            return self.mape(y_true, y_pred)
         else:
             raise ValueError(f"Unsupported metric '{self.metric}'")
 
