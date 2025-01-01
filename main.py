@@ -412,7 +412,7 @@ class AbdBase:
         y_pred = np.maximum(y_pred, 1e-6)
         return np.sqrt(mean_squared_log_error(y_true, y_pred))
 
-    def mape(y_true, y_pred):
+    def mape(self, y_true, y_pred):
         return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
 
     def get_metric(self, y_true, y_pred, weights=None):
