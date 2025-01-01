@@ -169,7 +169,7 @@ class AbdBase:
 
         if self.handle_date: 
             print(Fore.YELLOW + f"\nAdding Date Features")
-            self.cat_c = handle_date.get('cat_c', cat_c)
+            self.cat_c = handle_date.get('cat_c', [])
 
             if self.train_data is not None:
                     self.train_data = self.date(
