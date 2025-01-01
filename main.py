@@ -41,12 +41,13 @@ SEED = 42
 class AbdBase:
     
     model_name = ["LGBM", "CAT", "XGB","Voting",'TABNET']
-    metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse','wmae',"rmsle","mae", "r2",'mse']
+    metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse','wmae',"rmsle","mae", "r2",'mse',
+              'mape']
     problem_types = ["classification", "regression"]
     cv_types = ['SKF', 'KF', 'GKF', 'GSKF',"RKF"]
     current_version = ['V_1.3']
     
-    def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,numpy_data=False,
+    def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,numpy_data=False,handle_date=False,
                  problem_type="classification", metric="roc_auc", seed=SEED,ohe_fe=False,label_encode=False,target_encode=False,
                  n_splits=5, cat_features=None, num_classes=None, prob=False,stat_fe = None,logger: Optional[logging.Logger] = None,
                  early_stop=False, test_prob=False, fold_type='SKF',weights=None,multi_column_tfidf=None):
@@ -73,6 +74,7 @@ class AbdBase:
         self.ohe_fe = ohe_fe
         self.label_encode = label_encode
         self.target_encode = target_encode
+        self.handle_date = handle_date
         self.logger = logger or self._setup_default_logger()
         
         self._validate_input()
@@ -165,6 +167,22 @@ class AbdBase:
                 )
 
 
+        if self.handle_date: 
+            print(Fore.YELLOW + f"\nAdding Date Features")
+            self.cat_c = handle_date.get('cat_c', cat_c)
+
+            if self.train_data is not None:
+                    self.train_data = self.date(
+                        df=self.train_data,
+                        cat_c=self.cat_c,
+                    )
+
+            if self.test_data is not None:
+                    self.test_data = self.date(
+                        df=self.test_data,
+                        cat_c=self.cat_c,
+                    )
+
         self.X_train = self.train_data.drop(self.target_column, axis=1).to_numpy() if self.numpy_data else self.train_data.drop(self.target_column, axis=1)
         self.y_train = self.train_data[self.target_column].to_numpy() if self.numpy_data else self.train_data[self.target_column]
         self.y_train = self.y_train.reshape(-1, 1) if self.model_name == 'TABNET' else self.y_train
@@ -211,6 +229,33 @@ class AbdBase:
         test_encoded = test_encoded.drop(columns=[target_col])
         
         return train_encoded, test_encoded
+        
+    @staticmethod
+    def date(df, cat_c): 
+        df['date'] = pd.to_datetime(df['date'])
+        df['year'] = df['date'].dt.year
+        df['day'] = df['date'].dt.day
+        df['month'] = df['date'].dt.month
+        df['month_name'] = df['date'].dt.month_name()
+        df['day_of_week'] = df['date'].dt.day_name()
+        df['week'] = df['date'].dt.isocalendar().week
+        df['month_sin'] = np.sin(2 * np.pi * df['month'] / 12) 
+        df['month_cos'] = np.cos(2 * np.pi * df['month'] / 12)
+        df['day_sin'] = np.sin(2 * np.pi * df['day'] / 31)  
+        df['day_cos'] = np.cos(2 * np.pi * df['day'] / 31)
+        df['group'] = (df['year'] - 2020) * 48 + df['month'] * 4 + df['day'] // 7
+        
+        df.drop('date', axis=1, inplace=True)
+    
+        df['cos_year'] = np.cos(df['year'] * (2 * np.pi) / 100)
+        df['sin_year'] = np.sin(df['year'] * (2 * np.pi) / 100)
+        df['year_lag_1'] = df['year'].shift(1)
+        df['year_diff'] = df['year'] - df['year_lag_1']
+        
+        for c in cat_c:
+            df[c] = df[c].astype('category')
+    
+        return df
             
     @staticmethod
     def ohe_transform(train: pd.DataFrame, test: pd.DataFrame, cat_cols: list):
@@ -367,6 +412,9 @@ class AbdBase:
         y_pred = np.maximum(y_pred, 1e-6)
         return np.sqrt(mean_squared_log_error(y_true, y_pred))
 
+    def mape(y_true, y_pred):
+        return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+
     def get_metric(self, y_true, y_pred, weights=None):
         if self.metric == 'roc_auc':
             return roc_auc_score(y_true, y_pred, multi_class="ovr" if self.num_classes > 2 else None)
@@ -390,6 +438,8 @@ class AbdBase:
             return self.rmsLe(y_true, y_pred)
         elif self.metric == 'mse':
             return mean_squared_error(y_true, y_pred, squared=True)
+        elif self.metric == "mape":
+            return mape(y_true, y_pred)
         else:
             raise ValueError(f"Unsupported metric '{self.metric}'")
 
