@@ -2,7 +2,7 @@
 
 ## Overview
 
-`AbdBase` is a versatile machine learning utility class designed for various tasks, including classification and regression. It integrates popular models, such as LGBM, XGB, and TabNet, and provides tools for cross-validation, feature engineering, and model evaluation with multiple metrics.
+`AbdBase` is a machine learning utility class designed for various tasks, including classification and regression. It integrates popular models, such as LGBM, XGB, and TabNet, and provides tools for cross-validation, feature engineering, and model evaluation with multiple metrics.
 
 ## Features
 
@@ -10,7 +10,7 @@
 - **Metrics:** Supports a wide range of evaluation metrics like accuracy, ROC AUC, F1, MAE, RMSE, etc.
 - **Cross-validation:** Multiple cross-validation techniques including StratifiedKFold (SKF), KFold (KF), and GroupKFold (GKF).
 - **Problem Type:** Supports both classification and regression tasks.
-- **Feature Engineering:** Options for target encoding, one-hot encoding, and TF-IDF for multi-column text data.
+- **Feature Engineering:** Options for target encoding, one-hot encoding, and TF-IDF for multi-column text data, text Features.
 
 ## Installation
 
@@ -23,11 +23,17 @@ pip install -r requirements.txt
 ## Usage
 
 ```python
-from abd_base import AbdBase
+
+!git clone https://github.com/muhammadabdullah0303/AbdML
+
+import sys
+sys.path.append('/kaggle/working/repository')
+
+from AbdML.main import AbdBase
 
 # Initialize the AbdBase class
-model = AbdBase(train_data=train_data, test_data=test_data, target_column="target")
-model.fit()
+base = AbdBase(train_data=train_data, test_data=test_data, target_column="target")
+base.Train_ML(params,'LGBM',e_stop=50,) # Example 
 ```
 
 ## Parameters
@@ -40,3 +46,5 @@ model.fit()
 - `n_splits`: Number of splits for cross-validation.
 - `cat_features`: List of categorical features.
 - `gpu`: Whether to use GPU acceleration (optional).
+- `early_stop`: True or False.
+- `ohe_fe`: pass a dic of like params. Example :  ```ohe_cols = {'cat_c': cat_columns}```
