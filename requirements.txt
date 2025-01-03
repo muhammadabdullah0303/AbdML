@@ -1,0 +1,11 @@
+pandas
+numpy
+tqdm
+catboost
+lightgbm
+xgboost
+sklearn
+nltk
+optuna
+lifelines
+colorama
