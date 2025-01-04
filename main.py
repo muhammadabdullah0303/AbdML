@@ -40,7 +40,7 @@ SEED = 42
 
 class AbdBase:
     
-    model_name = ["LGBM", "CAT", "XGB","Voting",'TABNET']
+    model_name = ["LGBM", "CAT", "XGB","Voting",'TABNET','Ridge']
     metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse','wmae',"rmsle","mae", "r2",'mse',
               'mape']
     problem_types = ["classification", "regression"]
@@ -506,6 +506,8 @@ class AbdBase:
                 task_type='GPU' if self.gpu else 'CPU')
             elif model_name == 'Voting':
                 model = VotingClassifier(estimators=estimator,weights=V_weights if V_weights is not None else None) if self.problem_type == 'classification' else VotingRegressor(estimators=estimator,weights=V_weights if V_weights is not None else None)
+            elif model_name == 'Ridge':
+                model = Ridge(**params)
             else:
                 raise ValueError("model_name must be 'LGBM' or 'CAT'.")
 
@@ -523,6 +525,9 @@ class AbdBase:
                 model.fit(train_pool, eval_set=val_pool, early_stopping_rounds=e_stop if self.early_stop else None)
             
             elif model_name == 'Voting':
+                model.fit(X_train, y_train)
+
+            elif model_name == 'Ridge':
                 model.fit(X_train, y_train)
 
             if self.problem_type == 'classification':
