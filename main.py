@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from sklearn.linear_model import Ridge
+from sklearn.linear_model import LinearRegression
 from catboost import CatBoostClassifier, Pool, CatBoostRegressor
 # from pytorch_tabnet.tab_model import TabNetRegressor,TabNetClassifier
 import lightgbm as lgb
@@ -41,7 +42,7 @@ SEED = 42
 
 class AbdBase:
     
-    model_name = ["LGBM", "CAT", "XGB","Voting",'TABNET','Ridge']
+    model_name = ["LGBM", "CAT", "XGB","Voting",'TABNET','Ridge',"LR"]
     metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse','wmae',"rmsle","mae", "r2",'mse',
               'mape']
     problem_types = ["classification", "regression"]
@@ -509,6 +510,9 @@ class AbdBase:
                 model = VotingClassifier(estimators=estimator,weights=V_weights if V_weights is not None else None) if self.problem_type == 'classification' else VotingRegressor(estimators=estimator,weights=V_weights if V_weights is not None else None)
             elif model_name == 'Ridge':
                 model = Ridge(**params)
+            elif model_name == 'LR':
+                model = LinearRegression()
+                model.fit(X_train, y_train)
             else:
                 raise ValueError("model_name must be 'LGBM' or 'CAT'.")
 
