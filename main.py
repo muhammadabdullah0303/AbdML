@@ -3,6 +3,7 @@
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
+from sklearn.linear_model import Ridge
 from catboost import CatBoostClassifier, Pool, CatBoostRegressor
 # from pytorch_tabnet.tab_model import TabNetRegressor,TabNetClassifier
 import lightgbm as lgb
