@@ -51,7 +51,7 @@ class AbdBase:
     
     def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,numpy_data=False,handle_date=False,
                  problem_type="classification", metric="roc_auc", seed=SEED,ohe_fe=False,label_encode=False,target_encode=False,
-                 n_splits=5, cat_features=None, num_classes=None, prob=False,stat_fe = None,logger: Optional[logging.Logger] = None,
+                 n_splits=5, cat_features=None, num_classes=None, prob=False,stat_fe = None,logger: Optional[logging.Logger] = None,eval_metric_model = None,
                  early_stop=False, test_prob=False, fold_type='SKF',weights=None,multi_column_tfidf=None,custom_metric=None):
 
         self.train_data = train_data
@@ -78,6 +78,7 @@ class AbdBase:
         self.label_encode = label_encode
         self.target_encode = target_encode
         self.custom_metric = custom_metric
+        self.eval_metric_model = eval_metric_model
         self.logger = logger or self._setup_default_logger()
 
         if self.metric == "custom" and callable(self.custom_metric):
@@ -384,6 +385,7 @@ class AbdBase:
         print(Fore.RED + f"Calculate Test Probabilities: {Fore.CYAN + str(self.test_prob)}")  
         print(Fore.RED + f"Early Stopping: {Fore.CYAN + str(self.early_stop)}")  
         print(Fore.RED + f"GPU: {Fore.CYAN + str(self.gpu)}")
+        print(Fore.RED + f"Eval_Metric Selected is: {Fore.CYAN + str(self.eval_metric_model)}")
 
 
     def _validate_input(self):
@@ -499,49 +501,48 @@ class AbdBase:
 #                 train_weights, val_weights = self.weights.iloc[train_idx], self.weights.iloc[val_idx]
                 val_weights = distribute_test_weights(len(y_val), self.weights) # If Test Weights are Less || Sample Thm
                 train_weights = np.ones(len(y_train)) # If Train Weights are None 
+
+            callbacks = [early_stopping(stopping_rounds=e_stop, verbose=False)] if self.early_stop else None
+
+            device = 'gpu' if self.gpu else 'cpu'
+            xdevice = 'gpu_hist' if self.gpu else 'hist'
+            cdevice = 'GPU' if self.gpu else 'CPU'
         
             if model_name == 'LGBM':
-                model = lgb.LGBMClassifier(**params, random_state=self.seed, verbose=-1,device='gpu' if self.gpu else 'cpu') if self.problem_type == 'classification' else lgb.LGBMRegressor(**params, random_state=self.seed, verbose=-1,
-                device='gpu' if self.gpu else 'cpu')
+                model = lgb.LGBMClassifier(**params, random_state=self.seed, verbose=-1,device=device) if self.problem_type == 'classification' else lgb.LGBMRegressor(**params, random_state=self.seed, verbose=-1,
+                device=device)
+                model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.eval_metric_model, callbacks=callbacks)
+
             elif model_name == 'TABNET':
-                model = TabNetClassifier(**params, seed=self.seed, verbose=-1,device_name='gpu' if self.gpu else 'cpu') if self.problem_type == 'classification' else TabNetRegressor(**params, seed=self.seed, verbose=-1,
-                device_name='gpu' if self.gpu else 'cpu')
+                model = TabNetClassifier(**params, seed=self.seed, verbose=-1,device_name=device) if self.problem_type == 'classification' else TabNetRegressor(**params, seed=self.seed, verbose=-1,
+                device_name=device)
+                model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.eval_metric_model, **tab_net_train_params)
+
             elif model_name == 'XGB':
-                model = XGBClassifier(**params, random_state=self.seed, verbose=-1,tree_method='gpu_hist' if self.gpu else 'hist') if self.problem_type == 'classification' else XGBRegressor(**params, random_state=self.seed, verbose=-1,
-                tree_method='gpu_hist' if self.gpu else 'hist')
+                model = XGBClassifier(**params, random_state=self.seed, verbose=-1,tree_method=xdevice) if self.problem_type == 'classification' else XGBRegressor(**params, random_state=self.seed, verbose=-1,
+                tree_method=xdevice)
+                model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.eval_metric_model, early_stopping_rounds=e_stop if self.early_stop else None, verbose=False)
+
             elif model_name == 'CAT':
                 train_pool = Pool(data=X_train, label=y_train, cat_features=cat_features_indices)
                 val_pool = Pool(data=X_val, label=y_val, cat_features=cat_features_indices)
-                model = CatBoostClassifier(**params, random_state=self.seed, verbose=0,task_type='GPU' if self.gpu else 'CPU') if self.problem_type == 'classification' else CatBoostRegressor(**params, random_state=self.seed, verbose=0,
-                task_type='GPU' if self.gpu else 'CPU')
+                model = CatBoostClassifier(**params, random_state=self.seed, verbose=0,task_type=cdevice) if self.problem_type == 'classification' else CatBoostRegressor(**params, random_state=self.seed, verbose=0,
+                task_type=cdevice)
+                model.fit(train_pool, eval_set=val_pool, early_stopping_rounds=e_stop if self.early_stop else None)
+
             elif model_name == 'Voting':
                 model = VotingClassifier(estimators=estimator,weights=V_weights if V_weights is not None else None) if self.problem_type == 'classification' else VotingRegressor(estimators=estimator,weights=V_weights if V_weights is not None else None)
+                model.fit(X_train, y_train)
+            
             elif model_name == 'Ridge':
                 model = Ridge(**params)
+                model.fit(X_train, y_train)
+                
             elif model_name == 'LR':
                 model = LinearRegression()
                 model.fit(X_train, y_train)
             else:
                 raise ValueError("model_name must be 'LGBM' or 'CAT'.")
-
-            callbacks = [early_stopping(stopping_rounds=e_stop, verbose=False)] if self.early_stop else None
-            if model_name == 'LGBM':
-                model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.metric.lower() if self.metric.lower() in ['mae', 'mse', 'rmse', 'rmsle', 'wmae'] else None, callbacks=callbacks)
-            
-            elif model_name == 'TABNET':
-                model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.metric, **tab_net_train_params)
-            
-            elif model_name == 'XGB':
-                model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.metric.lower() if self.metric.lower() in ['mae', 'mse', 'rmse', 'rmsle', 'wmae'] else None, early_stopping_rounds=e_stop if self.early_stop else None, verbose=False)
-            
-            elif model_name == 'CAT':
-                model.fit(train_pool, eval_set=val_pool, early_stopping_rounds=e_stop if self.early_stop else None)
-            
-            elif model_name == 'Voting':
-                model.fit(X_train, y_train)
-
-            elif model_name == 'Ridge':
-                model.fit(X_train, y_train)
 
             if self.problem_type == 'classification':
                 y_train_pred = model.predict_proba(X_train)[:, 1] if self.num_classes == 2 else model.predict_proba(X_train) 
@@ -558,9 +559,17 @@ class AbdBase:
                 
             oof_predictions[val_idx] = y_val_pred
 
+            if self.num_classes == 2:
+                y_train_pred = np.round(y_train_pred)
+                y_val_pred = np.round(y_val_pred)
+
+            elif self.num_classes > 2:
+                y_train_pred = np.argmax(y_train_pred, axis =1)
+                y_val_pred = np.argmax(y_val_pred, axis =1)
+
             if self.metric == "accuracy":
-                train_scores.append(accuracy_score(y_train, np.argmax(y_train_pred, axis=1) if self.num_classes > 2 else (y_train_pred > 0.5).astype(int)))
-                oof_scores.append(accuracy_score(y_val, np.argmax(y_val_pred, axis=1) if self.num_classes > 2 else (y_val_pred > 0.5).astype(int)))
+                train_scores.append(accuracy_score(y_train, y_train_pred))
+                oof_scores.append(accuracy_score(y_val, y_val_pred))
             elif self.metric == "roc_auc":
                 train_scores.append(roc_auc_score(y_train, y_train_pred, multi_class="ovr" if self.num_classes > 2 else None))
                 oof_scores.append(roc_auc_score(y_val, y_val_pred, multi_class="ovr" if self.num_classes > 2 else None))
@@ -575,7 +584,7 @@ class AbdBase:
     
             if self.X_test is not None:
                 if self.problem_type == 'classification':
-                    test_preds[:, fold] = model.predict_proba(self.X_test)[:, 1] if self.test_prob else model.predict(self.X_test)
+                    test_preds[:, fold] = model.predict_proba(self.X_test)[:, 1] if self.num_classes == 2 else model.predict_proba(self.X_test)
                 elif model_name == 'TABNET':
                     pred = model.predict(self.X_test)
                     test_preds[:, fold] = pred.squeeze() 
@@ -596,6 +605,20 @@ class AbdBase:
 
         if y_log:
             mean_test_preds = np.expm1(mean_test_preds)
+
+        if self.prob:
+            oof_predictions = oof_predictions
+        elif not self.prob and self.num_classes == 2:
+            oof_predictions = np.round(oof_predictions)
+        elif not self.prob and self.num_classes > 2:
+            oof_predictions = np.argmax(oof_predictions, axis=1)
+
+        if self.test_prob:
+            mean_test_preds = mean_test_preds
+        elif not self.test_prob and self.num_classes == 2:
+            mean_test_preds = np.round(mean_test_preds)
+        elif not self.test_prob and self.num_classes > 2:
+            mean_test_preds = np.argmax(mean_test_preds, axis=1)
 
         return oof_predictions, mean_test_preds , model , all_models , mean_off_scores , mean_train_scores
     
