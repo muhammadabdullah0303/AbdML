@@ -44,7 +44,7 @@ class AbdBase:
     
     model_name = ["LGBM", "CAT", "XGB","Voting",'TABNET','Ridge',"LR"]
     metrics = ["roc_auc", "accuracy", "f1", "precision", "recall", 'rmse','wmae',"rmsle","mae", "r2",'mse',
-              'mape']
+              'mape',"custom"]
     problem_types = ["classification", "regression"]
     cv_types = ['SKF', 'KF', 'GKF', 'GSKF',"RKF"]
     current_version = ['V_1.3']
@@ -52,7 +52,7 @@ class AbdBase:
     def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,numpy_data=False,handle_date=False,
                  problem_type="classification", metric="roc_auc", seed=SEED,ohe_fe=False,label_encode=False,target_encode=False,
                  n_splits=5, cat_features=None, num_classes=None, prob=False,stat_fe = None,logger: Optional[logging.Logger] = None,
-                 early_stop=False, test_prob=False, fold_type='SKF',weights=None,multi_column_tfidf=None):
+                 early_stop=False, test_prob=False, fold_type='SKF',weights=None,multi_column_tfidf=None,custom_metric=None):
 
         self.train_data = train_data
         self.test_data = test_data
@@ -77,7 +77,13 @@ class AbdBase:
         self.ohe_fe = ohe_fe
         self.label_encode = label_encode
         self.target_encode = target_encode
+        self.custom_metric = custom_metric
         self.logger = logger or self._setup_default_logger()
+
+        if self.metric == "custom" and callable(self.custom_metric):
+            self.metric_name = self.custom_metric.__name__
+        else:
+            self.metric_name = self.metric
         
         self._validate_input()
         self.checkTarget()
@@ -436,6 +442,8 @@ class AbdBase:
             return mean_squared_error(y_true, y_pred, squared=True)
         elif self.metric == "mape":
             return self.mape(y_true, y_pred)
+        elif self.metric == 'custom' and callable(self.custom_metric):
+            return self.custom_metric(y_true, y_pred)
         else:
             raise ValueError(f"Unsupported metric '{self.metric}'")
 
@@ -518,13 +526,13 @@ class AbdBase:
 
             callbacks = [early_stopping(stopping_rounds=e_stop, verbose=False)] if self.early_stop else None
             if model_name == 'LGBM':
-                model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.metric.lower() if self.metric.lower() in ['mae', 'mse', 'rmse', 'rmsle', 'wmae'] else self.metric, callbacks=callbacks)
+                model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.metric.lower() if self.metric.lower() in ['mae', 'mse', 'rmse', 'rmsle', 'wmae'] else None, callbacks=callbacks)
             
             elif model_name == 'TABNET':
                 model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.metric, **tab_net_train_params)
             
             elif model_name == 'XGB':
-                model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.metric.lower() if self.metric.lower() in ['mae', 'mse', 'rmse', 'rmsle', 'wmae'] else self.metric, early_stopping_rounds=e_stop if self.early_stop else None, verbose=False)
+                model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.metric.lower() if self.metric.lower() in ['mae', 'mse', 'rmse', 'rmsle', 'wmae'] else None, early_stopping_rounds=e_stop if self.early_stop else None, verbose=False)
             
             elif model_name == 'CAT':
                 model.fit(train_pool, eval_set=val_pool, early_stopping_rounds=e_stop if self.early_stop else None)
@@ -536,8 +544,8 @@ class AbdBase:
                 model.fit(X_train, y_train)
 
             if self.problem_type == 'classification':
-                y_train_pred = model.predict_proba(X_train)[:, 1] if self.prob else model.predict(X_train)
-                y_val_pred = model.predict_proba(X_val)[:, 1] if self.prob else model.predict(X_val)
+                y_train_pred = model.predict_proba(X_train)[:, 1] if self.num_classes == 2 else model.predict_proba(X_train) 
+                y_val_pred = model.predict_proba(X_val)[:, 1] if self.num_classes == 2 else model.predict_proba(X_val) 
             else:
                 y_train_pred = model.predict(X_train)
                 y_val_pred = model.predict(X_val)
@@ -574,15 +582,15 @@ class AbdBase:
                 else:
                     test_preds[:, fold] = model.predict(self.X_test)
 
-            print(f"Fold {fold + 1} - Train {self.metric.upper()}: {train_scores[-1]:.4f}, OOF {self.metric.upper()}: {oof_scores[-1]:.4f}") if optuna == False else None
+            print(f"Fold {fold + 1} - Train {self.metric_name.upper()}: {train_scores[-1]:.4f}, OOF {self.metric_name.upper()}: {oof_scores[-1]:.4f}") if optuna == False else None
             all_models.append(model)
             clear_output(wait=True) if optuna == False else None
             
         mean_train_scores = f"{np.mean(train_scores):.4f}"
         mean_off_scores = f"{np.mean(oof_scores):.4f}"
         
-        print(f"Overall Train {self.metric.upper()}: {mean_train_scores}") if optuna == False else None
-        print(f"Overall OOF {self.metric.upper()}: {mean_off_scores} ") if optuna == False else None
+        print(f"Overall Train {self.metric_name.upper()}: {mean_train_scores}") if optuna == False else None
+        print(f"Overall OOF {self.metric_name.upper()}: {mean_off_scores} ") if optuna == False else None
 
         mean_test_preds = test_preds.mean(axis=1) if self.X_test is not None else None
 
