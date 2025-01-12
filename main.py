@@ -51,7 +51,7 @@ class AbdBase:
     current_version = ['V_1.3']
     
     def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,numpy_data=False,handle_date=False,
-                 ordinal_encoder = False
+                 ordinal_encoder = False,
                  problem_type="classification", metric="roc_auc", seed=SEED,ohe_fe=False,label_encode=False,target_encode=False,
                  n_splits=5, cat_features=None, num_classes=None, prob=False,stat_fe = None,logger: Optional[logging.Logger] = None,eval_metric_model = None,
                  early_stop=False, test_prob=False, fold_type='SKF',weights=None,multi_column_tfidf=None,custom_metric=None):
