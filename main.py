@@ -6,6 +6,7 @@ from tqdm import tqdm
 from sklearn.linear_model import Ridge
 from sklearn.linear_model import LinearRegression
 from catboost import CatBoostClassifier, Pool, CatBoostRegressor
+from sklearn.preprocessing import OrdinalEncoder
 # from pytorch_tabnet.tab_model import TabNetRegressor,TabNetClassifier
 import lightgbm as lgb
 from lightgbm import LGBMRegressor, early_stopping
@@ -50,6 +51,7 @@ class AbdBase:
     current_version = ['V_1.3']
     
     def __init__(self, train_data, test_data=None, target_column=None,tf_vec=False,gpu=False,numpy_data=False,handle_date=False,
+                 ordinal_encoder = False
                  problem_type="classification", metric="roc_auc", seed=SEED,ohe_fe=False,label_encode=False,target_encode=False,
                  n_splits=5, cat_features=None, num_classes=None, prob=False,stat_fe = None,logger: Optional[logging.Logger] = None,eval_metric_model = None,
                  early_stop=False, test_prob=False, fold_type='SKF',weights=None,multi_column_tfidf=None,custom_metric=None):
@@ -76,6 +78,7 @@ class AbdBase:
         self.handle_date = handle_date
         self.ohe_fe = ohe_fe
         self.label_encode = label_encode
+        self.ordinal_encoder = ordinal_encoder
         self.target_encode = target_encode
         self.custom_metric = custom_metric
         self.eval_metric_model = eval_metric_model
@@ -162,6 +165,16 @@ class AbdBase:
                     cat_cols=self.cat_c, 
                 )
 
+        if self.ordinal_encoder:
+            print(Fore.YELLOW + f"\n---> Applying Ordinal Encoder\n")
+            self.cat_c = ordinal_encoder.get('cat_c', [])
+            if self.train_data is not None and self.test_data is not None:
+                self.train_data, self.test_data = self.ordinal_encode_transform(
+                    train=self.train_data,
+                    test=self.test_data,
+                    cat_cols=self.cat_c, 
+                )
+
         if self.target_encode:
             print(Fore.YELLOW + f"\n---> Applying Target Encoder\n")
             self.cat_c = target_encode.get('cat_c', [])
@@ -209,6 +222,19 @@ class AbdBase:
             label_encoders[col] = le
         
         return train, test
+
+    @staticmethod
+    def ordinal_encode_transform(train: pd.DataFrame, test: pd.DataFrame, cat_cols: list):
+        encoders = {}
+        
+        for col in cat_cols:
+            encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
+            train[[col]] = encoder.fit_transform(train[[col]])
+            test[[col]] = encoder.transform(test[[col]])
+            encoders[col] = encoder
+        
+        return train, test
+
         
     @staticmethod
     def factorize_and_encode(train: pd.DataFrame, test: pd.DataFrame, cat_cols: list, target_col) -> pd.DataFrame:
