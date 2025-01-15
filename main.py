@@ -639,12 +639,14 @@ class AbdBase:
         elif not self.prob and self.num_classes > 2:
             oof_predictions = np.argmax(oof_predictions, axis=1)
 
-        if self.test_prob:
-            mean_test_preds = mean_test_preds
-        elif not self.test_prob and self.num_classes == 2:
-            mean_test_preds = np.round(mean_test_preds)
-        elif not self.test_prob and self.num_classes > 2:
-            mean_test_preds = np.argmax(mean_test_preds, axis=1)
+        if self.test_data is not None:
+
+            if self.test_prob:
+                mean_test_preds = mean_test_preds
+            elif not self.test_prob and self.num_classes == 2:
+                mean_test_preds = np.round(mean_test_preds)
+            elif not self.test_prob and self.num_classes > 2:
+                mean_test_preds = np.argmax(mean_test_preds, axis=1)
 
         return oof_predictions, mean_test_preds , model , all_models , mean_off_scores , mean_train_scores
     
