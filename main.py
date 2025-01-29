@@ -34,6 +34,8 @@ import pandas.api.types
 from lifelines.utils import concordance_index
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
+import pandas as pd   # For working with data
+import plotly.graph_objects as go   # For creating interactive plots
 
 class ParticipantVisibleError(Exception):
     pass
@@ -390,6 +392,46 @@ class AbdBase:
         test_with_tfidf = pd.concat([test, *test_features], axis=1)
 
         return train_with_tfidf, test_with_tfidf
+
+    def target_distribution(self, column_name, dataframe):
+        value_counts = dataframe[column_name].value_counts()
+    
+        palette = [
+            "#87CEEB",  # Sky Blue
+            "#FFDAB9",  # Peachy Tone
+            "#F0E68C",  # Khaki
+            "#4682B4",  # Steel Blue
+            "#FFA07A",  # Light Salmon
+            "#7FFFD4",  # Aquamarine
+            "#DDA0DD",  # Plum
+            "#FFDEAD",  # Navajo White
+            "#87CEFA",  # Light Sky Blue
+            "#F08080"   # Light Coral
+        ]
+    
+        fig = go.Figure()
+        fig.add_trace(go.Pie(labels=value_counts.index, values=value_counts.values, hole=0.2, marker_colors=palette,
+                             domain={'x': [0, 0.5], 'y': [0, 1]}, pull=[0.1, 0.1])) 
+        fig.add_trace(go.Bar(x=value_counts.index, y=value_counts.values,
+                             marker_color=palette, 
+                             xaxis='x2', yaxis='y2'))
+        fig.update_traces(hoverinfo='label+percent', textinfo='value', textfont_size=20,
+                          marker=dict(line=dict(color='#000000', width=2)), selector=dict(type='pie'))
+        fig.update_layout(
+            title=f'Distribution of {column_name}',
+            title_font_size=20,
+            annotations=[
+                {'text': '', 'x': 0.2, 'y': 0.5, 'showarrow': False, 'font': {'size': 16}}, 
+                {'text': '', 'x': 0.8, 'y': 0.5, 'showarrow': False, 'font': {'size': 16}}
+            ],
+            grid={'rows': 1, 'columns': 2},
+            xaxis=dict(domain=[0, 0.5]),
+            xaxis2=dict(domain=[0.55, 1]),
+            yaxis=dict(domain=[0, 1]),
+            yaxis2=dict(domain=[0, 1], anchor='x2')
+        )
+    
+        fig.show()
 
     def checkTarget(self):
         if self.train_data[self.target_column].dtype == 'object':
