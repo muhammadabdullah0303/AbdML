@@ -291,7 +291,7 @@ class AbdBase:
     @staticmethod
     def ohe_transform(train: pd.DataFrame, test: pd.DataFrame, cat_cols: list):
     
-        ohe = OneHotEncoder(sparse=False, handle_unknown='ignore')
+        ohe = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
     
         train_ohe = pd.DataFrame(ohe.fit_transform(train[cat_cols]), 
                                  columns=ohe.get_feature_names_out(cat_cols), 
