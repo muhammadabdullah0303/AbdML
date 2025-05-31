@@ -31,7 +31,7 @@ from typing import Dict, Any, Optional, Union, Tuple
 from colorama import Fore
 import logging
 import pandas.api.types
-from lifelines.utils import concordance_index
+# from lifelines.utils import concordance_index
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 import pandas as pd   # For working with data
