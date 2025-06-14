@@ -613,8 +613,8 @@ class AbdBase:
                 raise ValueError("model_name must be 'LGBM' or 'CAT'.")
 
             if self.problem_type == 'classification':
-                y_train_pred = model.predict_proba(X_train)[:, 1] if self.num_classes == 2 else model.predict_proba(X_train) 
-                y_val_pred = model.predict_proba(X_val)[:, 1] if self.num_classes == 2 else model.predict_proba(X_val) 
+                y_train_pred = model.predict_proba(X_train)[:, 1] if self.num_classes == 2 else model.predict_proba(X_train)
+                y_val_pred = model.predict_proba(X_val)[:, 1] if self.num_classes == 2 else model.predict_proba(X_val)
             else:
                 y_train_pred = model.predict(X_train)
                 y_val_pred = model.predict(X_val)
@@ -627,13 +627,21 @@ class AbdBase:
                 
             oof_predictions[val_idx] = y_val_pred
 
-            if self.num_classes == 2:
-                y_train_pred = np.round(y_train_pred)
-                y_val_pred = np.round(y_val_pred)
+            # if self.num_classes == 2:
+            #     y_train_pred = np.round(y_train_pred)
+            #     y_val_pred = np.round(y_val_pred)
 
-            elif self.num_classes > 2:
-                y_train_pred = np.argmax(y_train_pred, axis =1)
-                y_val_pred = np.argmax(y_val_pred, axis =1)
+            # elif self.num_classes > 2:
+            #     y_train_pred = np.argmax(y_train_pred, axis =1)
+            #     y_val_pred = np.argmax(y_val_pred, axis =1)
+
+            if self.metric in ["accuracy", "roc_auc"]:
+                if self.num_classes == 2:
+                    y_train_pred = np.round(y_train_pred)
+                    y_val_pred = np.round(y_val_pred)
+                elif self.num_classes > 2:
+                    y_train_pred = np.argmax(y_train_pred, axis=1)
+                    y_val_pred = np.argmax(y_val_pred, axis=1)
 
             if self.metric == "accuracy":
                 train_scores.append(accuracy_score(y_train, y_train_pred))
