@@ -573,7 +573,7 @@ class AbdBase:
             callbacks = [early_stopping(stopping_rounds=e_stop, verbose=False)] if self.early_stop else None
 
             device = 'gpu' if self.gpu else 'cpu'
-            xdevice = 'gpu_hist' if self.gpu else 'hist'
+            xdevice = 'cuda' if self.gpu else 'cpu'
             cdevice = 'GPU' if self.gpu else 'CPU'
         
             if model_name == 'LGBM':
@@ -587,9 +587,9 @@ class AbdBase:
                 model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.eval_metric_model, **tab_net_train_params)
 
             elif model_name == 'XGB':
-                model = XGBClassifier(**params, random_state=self.seed, verbose=-1,tree_method=xdevice) if self.problem_type == 'classification' else XGBRegressor(**params, random_state=self.seed, verbose=-1,
+                model = XGBClassifier(**params, random_state=self.seed, verbose=-1,device=xdevice ) if self.problem_type == 'classification' else XGBRegressor(**params, random_state=self.seed, verbose=-1,
                 tree_method=xdevice)
-                model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric=self.eval_metric_model, early_stopping_rounds=e_stop if self.early_stop else None, verbose=False)
+                model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
 
             elif model_name == 'CAT':
                 train_pool = Pool(data=X_train, label=y_train, cat_features=cat_features_indices)
